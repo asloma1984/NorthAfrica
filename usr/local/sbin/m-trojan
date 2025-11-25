@@ -1,0 +1,60 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9+/Ubuntu 18.04+/20+
+# Develovers » savagetech56࿐
+# Email      » johntezali56@gmail.com
+# telegram   » https://t.me/ToxicSavage 
+# whatsapp   » wa.me/+254716637803
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# premium࿐
+
+RED="\033[31m"
+YELLOW="\033[33m"
+NC='\e[0m'
+YELL='\033[0;33m'
+BRED='\033[1;31m'
+GREEN='\033[0;32m'
+ORANGE='\033[33m'
+BGWHITE='\e[0;100;37m'
+
+clear
+
+echo -e ""
+echo -e " ${NC} ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NC}"
+echo -e " ${NC}  ${BGWHITE}             MENU MANAGER TROJAN GO             ${NC}"
+echo -e " ${NC} ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NC}"
+echo -e " ${NC} ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NC}"
+echo -e " ${NC}   ${NC}[${GREEN}01${NC}]${YELL} Create Account Trojan WS/GRPC${NC}"
+echo -e " ${NC}   ${NC}[${GREEN}02${NC}]${YELL} Create Trial Trojan WS/GRPC${NC}"
+echo -e " ${NC}   ${NC}[${GREEN}03${NC}]${YELL} Delete Account Trojan WS/GRPC${NC}"
+echo -e " ${NC}   ${NC}[${GREEN}04${NC}]${YELL} Renew Trojan Account${NC}"
+echo -e " ${NC}   ${NC}[${GREEN}05${NC}]${YELL} Check Trojan login Account${NC}"
+echo -e " ${NC}   ${NC}[${RED}0X${NC}]${RED} ComeBack Menu${NC}"
+echo -e " ${NC} ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NC}"
+echo -e ""
+read -p "  Select From Options [ 1-8 / 0X ] »» " menu
+
+case $menu in
+1 | 01)
+    addtr
+    ;;
+2 | 02)
+    trialtr
+    ;;
+3 | 03)
+    deltr
+    ;;
+4 | 04)
+    renewtr
+    ;;
+5 | 05)
+    cektr
+    ;;
+0 | 00 | x | X | 0x | 0X)
+    clear
+    menu
+    ;;    
+*)
+    m-trojan
+    ;;
+esac
