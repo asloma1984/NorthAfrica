@@ -1,7 +1,7 @@
 <img src="https://readme-typing-svg.herokuapp.com?color=%2336BCF7&center=true&vCenter=true&lines=+W+E+L+C+O+M+E" />
 </p>
 </p>
-<img src="https://readme-typing-svg.herokuapp.com?color=%234d8c33ff&center=true&vCenter=true&lines=TO ABDUL TECH" />
+<img src="https://readme-typing-svg.herokuapp.com?color=%234d8c33ff&center=true&vCenter=true&lines=ABDULTECH" />
 </p>
 <p align="center"> 
  𝚅𝙸𝚂𝙸𝚃𝙾𝚁𝚂 𝙲𝙾𝚄𝙽𝚃
@@ -16,24 +16,24 @@ apt update -y && apt upgrade -y && apt dist-upgrade -y && reboot
 ```
 
 ##  UPGRADE FOR UBUNTU
-OS Ubuntu Version 18 atau 20
+OS Ubuntu Version 18 atau 25
 ```
 apt update && apt upgrade -y && update-grub && sleep 2 && reboot
 ```
 
 ## INSTALL SCRIPT 
-Autoscript Premium by savagetech56 
+Autoscript Premium by abdul 
 ```
-apt install -y && apt update -y && apt upgrade -y && wget -q https://raw.githubusercontent.com/savagetech56/premium/main/premium.sh && chmod +x premium.sh && ./premium.sh
+apt install -y && apt update -y && apt upgrade -y && wget -q https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/premium.sh && chmod +x premium.sh && ./premium.sh
 ```
 ## UPDATE SCRIPT
 via
 ```
-wget -q https://raw.githubusercontent.com/savagetech56/premium/main/update.sh && chmod +x update.sh && ./update.sh
+wget -q https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/update.sh && chmod +x update.sh && ./update.sh
 ```
 
 ## TESTED ON OS
-- UBUNTU Version 18 Atau 20 (Recommended)
+- UBUNTU Version 18 Atau 25 (Recommended)
 - DEBIAN Version 09 Atau 10
 
 ## FEATURES 
@@ -77,7 +77,7 @@ wget -q https://raw.githubusercontent.com/savagetech56/premium/main/update.sh &&
 ```
 
 ## MENU FOR SCRIPT
-<img width="100%" alt="IMG-20250215-WA0003(1).jpg" src="https://github.com/savagetech56/premium/blob/main/assets/IMG-20250215-WA0003(1).jpg">
+<img width="100%" alt="IMG-20250215-WA0003(1).jpg" src="https://github.com/asloma1984/NorthAfrica/blob/main/assets/IMG-20250215-WA0003(1).jpg">
 
 ### CONTACT ADMIN !
 savagetech56:
