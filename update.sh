@@ -23,32 +23,39 @@ NC='\e[0m'
 
 clear
 
-# Progress Bar Function
+# Fixed Progress Bar Function
 fun_bar() {
-    CMD[0]="$1"
-    CMD[1]="$2"
+    local command="$1"
+    local description="$2"
+    
+    echo -e "${OK} $description"
+    
+    # Create temporary file to track progress
+    local temp_file=$(mktemp)
+    
+    # Run the command in background and track progress
     (
-        [[ -e $HOME/fim ]] && rm "$HOME/fim"
-        ${CMD[0]} >/dev/null 2>&1
-        ${CMD[1]} >/dev/null 2>&1
-        touch "$HOME/fim"
-    ) >/dev/null 2>&1 &
-    tput civis
-    echo -ne "\033[0;33mPlease wait, loading \033[1;37m- \033[0;33m["
-    while true; do
-        for ((i = 0; i < 18; i++)); do
-            echo -ne "\033[0;32m#"
-            sleep 0.1s
-        done
-        [[ -e $HOME/fim ]] && rm "$HOME/fim" && break
-        echo -e "\033[0;33m]"
-        sleep 1s
-        tput cuu1
-        tput dl1
-        echo -ne "\033[0;33mPlease wait, loading \033[1;37m- \033[0;33m["
+        $command >/dev/null 2>&1
+        echo "100" > "$temp_file"
+    ) &
+    
+    local pid=$!
+    local i=0
+    local spin='-\|/'
+    
+    # Show progress animation
+    while kill -0 "$pid" 2>/dev/null; do
+        i=$(( (i+1) % 4 ))
+        printf "\r[${spin:$i:1}] Processing... Please wait "
+        sleep 0.5
     done
-    echo -e "\033[0;33m]\033[1;37m -\033[1;32m OK!\033[1;37m"
-    tput cnorm
+    
+    # Wait for process to complete
+    wait "$pid"
+    
+    # Clean up
+    rm -f "$temp_file"
+    printf "\r${OK} Completed successfully!                          \n"
 }
 
 # Safety Check Function
@@ -56,46 +63,54 @@ check_safety() {
     echo -e "\033[0;36mChecking connection and file integrity...\033[0m"
     
     # Check internet connection
-    ping -c1 github.com >/dev/null 2>&1 || {
+    if ! ping -c1 -W2 github.com >/dev/null 2>&1; then
         echo -e "${ERROR} No internet connection!"
-        exit 1
-    }
+        return 1
+    fi
     
     # Check if file exists on GitHub
-    wget -q --spider https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip || {
+    echo -e "${OK} Verifying update source..."
+    if ! wget -q --spider --timeout=10 "https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip"; then
         echo -e "${ERROR} menu.zip not found on GitHub!"
-        exit 1
-    }
+        return 1
+    fi
     
     # Download the file
     echo -e "${OK} Downloading update package..."
-    wget -q -O menu.zip https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip || {
+    if ! wget -q --timeout=30 -O menu.zip "https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip"; then
         echo -e "${ERROR} Failed to download menu.zip!"
-        exit 1
-    }
+        return 1
+    fi
     
     # Check file size
-    SIZE=$(stat -c%s "menu.zip" 2>/dev/null || echo "0")
+    local SIZE=0
+    if [[ -f "menu.zip" ]]; then
+        SIZE=$(stat -c%s "menu.zip" 2>/dev/null || echo "0")
+    fi
+    
     if [[ $SIZE -lt 50000 ]]; then
         echo -e "${ERROR} Invalid or corrupted menu.zip! (Size: ${SIZE} bytes)"
         rm -f menu.zip
-        exit 1
+        return 1
     fi
     
     echo -e "${OK} File verified successfully. (Size: ${SIZE} bytes)"
+    return 0
 }
 
 # Main Update Function
-res1() {
+perform_update() {
+    echo -e "${OK} Starting update process..."
+    
     # Run safety check
-    check_safety || {
-        echo -e "${ERROR} Safety check failed!"
+    if ! check_safety; then
+        echo -e "${ERROR} Safety check failed! Update aborted."
         return 1
-    }
+    fi
     
     # Create backup
     echo -e "${OK} Creating backup..."
-    backup_dir="/root/backup_$(date +%Y%m%d_%H%M%S)"
+    local backup_dir="/root/backup_$(date +%Y%m%d_%H%M%S)"
     mkdir -p "$backup_dir"
     
     # Backup existing menu files
@@ -106,14 +121,20 @@ res1() {
     
     # Extract files
     echo -e "${OK} Extracting files..."
-    unzip -oq menu.zip || {
+    if ! unzip -oq menu.zip; then
         echo -e "${ERROR} Failed to extract menu.zip!"
         return 1
-    }
+    fi
     
     # Check if menu directory exists
     if [[ ! -d "menu" ]]; then
         echo -e "${ERROR} 'menu' directory not found in zip file!"
+        return 1
+    fi
+    
+    # Check if there are files in menu directory
+    if [[ -z "$(ls -A menu/ 2>/dev/null)" ]]; then
+        echo -e "${ERROR} No files found in menu directory!"
         return 1
     fi
     
@@ -126,7 +147,10 @@ res1() {
     
     # Copy files to destination
     echo -e "${OK} Installing updates..."
-    cp -r menu/* /usr/local/sbin/ 2>/dev/null
+    if ! cp -r menu/* /usr/local/sbin/ 2>/dev/null; then
+        echo -e "${ERROR} Failed to copy files to /usr/local/sbin/"
+        return 1
+    fi
     
     # Set permissions for all copied files
     chmod +x /usr/local/sbin/* 2>/dev/null
@@ -142,7 +166,7 @@ res1() {
     return 0
 }
 
-# Check if netfilter-persistent is available and reload it
+# Check and reload netfilter-persistent
 reload_netfilter() {
     if command -v netfilter-persistent &>/dev/null; then
         echo -e "${OK} Reloading netfilter-persistent..."
@@ -150,13 +174,22 @@ reload_netfilter() {
     fi
 }
 
+# Check if lolcat is available, if not use fallback
+safe_lolcat() {
+    if command -v lolcat &>/dev/null; then
+        echo "$1" | lolcat
+    else
+        echo "$1"
+    fi
+}
+
 # Main Execution
 clear
 
 # Display header
-echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+safe_lolcat "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "\e[1;97;101m            » UPDATE SCRIPT «             \033[0m"
-echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+safe_lolcat "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "\033[1;91mUpdating North Africa Script Service\033[1;37m"
 echo -e ""
 
@@ -167,28 +200,31 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Check if lolcat is installed, if not try to install it
+# Check if we can install lolcat if missing
 if ! command -v lolcat &>/dev/null; then
-    echo -e "${OK} Installing lolcat for better display..."
-    apt-get update >/dev/null 2>&1
-    apt-get install -y ruby >/dev/null 2>&1
-    gem install lolcat >/dev/null 2>&1
+    echo -e "${YELLOW}[INFO] lolcat not found, using plain text display${NC}"
 fi
 
-# Execute update with progress bar
-fun_bar 'res1'
+# Execute update with simple progress
+echo -e "${OK} Starting update process..."
+if perform_update; then
+    echo -e "\033[1;92m✅ Update Completed Successfully!\033[0m"
+else
+    echo -e "\033[1;91m❌ Update Failed!\033[0m"
+    exit 1
+fi
 
 # Reload netfilter-persistent after update
 reload_netfilter
 
 # Display completion message
-echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+safe_lolcat "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e ""
 echo -e "\033[1;92m✅ Update Completed Successfully!\033[0m"
 echo -e ""
 echo -e "\033[1;94m📊 Update Summary:\033[0m"
 echo -e "   ${OK} Files downloaded and verified"
-echo -e "   ${OK} Backup created successfully"
+echo -e "   ${OK} Backup created successfully" 
 echo -e "   ${OK} Permissions set correctly"
 echo -e "   ${OK} System services reloaded"
 echo -e ""
@@ -219,14 +255,16 @@ echo -e ""
 # Restart related services if they exist
 echo -e "\033[1;93m🔄 Restarting related services...\033[0m"
 for service in "${services[@]}"; do
-    if systemctl list-unit-files | grep -q "$service.service"; then
-        systemctl restart "$service" >/dev/null 2>&1 && \
-        echo -e "   ${OK} $service service restarted" || \
-        echo -e "   ${ERROR} Failed to restart $service"
+    if systemctl list-unit-files | grep -q "$service.service" && systemctl is-active "$service" >/dev/null 2>&1; then
+        if systemctl restart "$service" >/dev/null 2>&1; then
+            echo -e "   ${OK} $service service restarted"
+        else
+            echo -e "   ${ERROR} Failed to restart $service"
+        fi
     fi
 done
 
-sleep 3
+sleep 2
 
 # Return to main menu if available
 echo -e ""
@@ -237,9 +275,7 @@ if command -v menu &>/dev/null; then
     menu
 else
     echo -e "\033[1;93m⚠️  Note: Main menu command not found\033[0m"
-    echo -e "${OK} You can access scripts manually from /usr/local/sbin/"
-    echo -e "${OK} Available commands:"
-    ls /usr/local/sbin/ 2>/dev/null | head -10
+    echo -e "${OK} Update completed. You can run scripts from /usr/local/sbin/"
     echo -e ""
     read -p "$(echo -e "Press ${Green}Enter${NC} to exit") "
     clear
