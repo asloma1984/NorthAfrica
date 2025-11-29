@@ -40,7 +40,6 @@ echo -e "  Recoded by myself ABDUL ${YELLOW}(${NC} 2024 ${YELLOW})${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 sleep 2
-###### IZIN SC 
 
 # // Checking OS Architecture
 if [[ $(uname -m | awk '{print $1}') == "x86_64" ]]; then
@@ -83,7 +82,7 @@ fi
 red='\e[1;31m'
 green='\e[0;32m'
 NC='\e[0m'
-#IZIN SCRIPT
+
 MYIP=$(curl -sS ipv4.icanhazip.com)
 echo -e "\e[32mloading...\e[0m"
 clear
@@ -91,6 +90,7 @@ apt install ruby -y
 gem install lolcat
 apt install wondershaper -y
 clear
+
 # REPO    
 REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/"
 
@@ -99,6 +99,7 @@ start=$(date +%s)
 secs_to_human() {
     echo "Installation time : $((${1} / 3600)) hours $(((${1} / 60) % 60)) minutes $((${1} % 60)) seconds"
 }
+
 ### Status
 function print_ok() {
     echo -e "${OK} ${BLUE} $1 ${FONT}"
@@ -143,6 +144,7 @@ chmod +x /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
 mkdir -p /var/lib/kyt >/dev/null 2>&1
+
 # // Ram Information
 while IFS=":" read -r a b; do
     case $a in
@@ -172,7 +174,7 @@ function first_setup(){
         sudo apt update -y
         apt-get install --no-install-recommends software-properties-common
         add-apt-repository ppa:vbernat/haproxy-2.0 -y
-        apt-get -y install haproxy=2.0.\*
+        apt-get -y install haproxy=2.0.*
     elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
         echo "Setup dependencies for OS $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
         curl https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
@@ -180,7 +182,7 @@ function first_setup(){
             http://haproxy.debian.net buster-backports-1.8 main \
             >/etc/apt/sources.list.d/haproxy.list
         sudo apt-get update
-        apt-get -y install haproxy=1.8.\*
+        apt-get -y install haproxy=1.8.*
     else
         echo -e " Your OS is not supported ($(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g') )"
         exit 1
@@ -364,26 +366,47 @@ By 🧢 ABDUL 🧬 | NorthAfrica
 }
 
 clear
-# Install SSL
+# Install SSL - FIXED VERSION
 function pasang_ssl() {
     clear
     print_install "Install SSL on domain"
+    
+    # Ensure socat is installed for ACME
+    apt install socat -y
+    
     rm -rf /etc/xray/xray.key
     rm -rf /etc/xray/xray.crt
     domain=$(cat /root/domain)
     STOPWEBSERVER=$(lsof -i:80 | cut -d' ' -f1 | awk 'NR==2 {print $1}')
     rm -rf /root/.acme.sh
     mkdir /root/.acme.sh
-    systemctl stop $STOPWEBSERVER
-    systemctl stop nginx
-    curl https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
-    chmod +x /root/.acme.sh/acme.sh
-    /root/.acme.sh/acme.sh --upgrade --auto-upgrade
-    /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    /root/.acme.sh/acme.sh --issue -d $domain --standalone -k ec-256
-    ~/.acme.sh/acme.sh --installcert -d $domain --fullchainpath /etc/xray/xray.crt --keypath /etc/xray/xray.key --ecc
-    chmod 777 /etc/xray/xray.key
-    print_success "SSL certificate"
+    
+    # Stop services using port 80
+    systemctl stop $STOPWEBSERVER 2>/dev/null
+    systemctl stop nginx 2>/dev/null
+    systemctl stop haproxy 2>/dev/null
+    
+    # Install ACME properly
+    curl https://get.acme.sh | sh
+    source ~/.bashrc
+    ~/.acme.sh/acme.sh --upgrade --auto-upgrade
+    ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+    
+    # Issue certificate with debug
+    ~/.acme.sh/acme.sh --issue -d $domain --standalone -k ec-256 --debug --force
+    
+    # Install certificate
+    ~/.acme.sh/acme.sh --installcert -d $domain \
+        --fullchainpath /etc/xray/xray.crt \
+        --keypath /etc/xray/xray.key --ecc
+        
+    chmod 644 /etc/xray/xray.key
+    
+    # Restart services
+    systemctl start nginx 2>/dev/null
+    systemctl start haproxy 2>/dev/null
+    
+    print_success "SSL Certificate"
 }
 
 function make_folder_xray() {
@@ -466,6 +489,7 @@ function install_xray() {
 
     rm -rf /etc/systemd/system/xray.service.d
     cat >/etc/systemd/system/xray.service <<EOF
+[Unit]
 Description=Xray Service
 Documentation=https://github.com
 After=network.target nss-lookup.target
@@ -944,6 +968,7 @@ function instal(){
     restart_system
 }
 
+# Start installation
 instal
 echo ""
 history -c
