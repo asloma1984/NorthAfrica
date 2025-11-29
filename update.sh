@@ -40,14 +40,38 @@ fun_bar() {
     tput cnorm
 }
 
+# 🔐 دالة التحقق من الاتصال وسلامة الملف
+check_safety() {
+    echo -e "\033[0;36mChecking connection and file integrity...\033[0m"
+    ping -c1 github.com >/dev/null 2>&1 || {
+        echo -e "\033[0;31m[ERROR]\033[0m No internet connection!"
+        exit 1
+    }
+
+    wget -q --spider https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip || {
+        echo -e "\033[0;31m[ERROR]\033[0m menu.zip not found on GitHub!"
+        exit 1
+    }
+
+    wget -q -O menu.zip https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip
+
+    # 🔍 تحقق من حجم الملف (أكثر من 50KB يعني ملف حقيقي)
+    SIZE=$(stat -c%s "menu.zip")
+    if [[ $SIZE -lt 50000 ]]; then
+        echo -e "\033[0;31m[ERROR]\033[0m Invalid or corrupted menu.zip!"
+        rm -f menu.zip
+        exit 1
+    fi
+
+    echo -e "\033[1;32mFile verified successfully.\033[0m"
+}
+
 res1() {
-    wget https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip
-    unzip menu.zip
+    check_safety
+    unzip -oq menu.zip
     chmod +x menu/*
-    mv menu/* /usr/local/sbin
-    rm -rf menu
-    rm -rf menu.zip
-    rm -rf update.sh
+    mv menu/* /usr/local/sbin/
+    rm -rf menu menu.zip update.sh
 }
 
 netfilter-persistent
