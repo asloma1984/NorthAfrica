@@ -23,175 +23,134 @@ NC='\e[0m'
 
 clear
 
-# Fixed Progress Bar Function
+# Your Repository - CHANGE THIS TO YOUR REPO
+YOUR_REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main"
+YOUR_UPLOAD_REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main"
+
+# Progress Bar Function
 fun_bar() {
-    local command="$1"
-    local description="$2"
-    
-    echo -e "${OK} $description"
-    
-    # Create temporary file to track progress
-    local temp_file=$(mktemp)
-    
-    # Run the command in background and track progress
+    CMD[0]="$1"
+    CMD[1]="$2"
     (
-        $command >/dev/null 2>&1
-        echo "100" > "$temp_file"
-    ) &
-    
-    local pid=$!
-    local i=0
-    local spin='-\|/'
-    
-    # Show progress animation
-    while kill -0 "$pid" 2>/dev/null; do
-        i=$(( (i+1) % 4 ))
-        printf "\r[${spin:$i:1}] Processing... Please wait "
-        sleep 0.5
+        [[ -e $HOME/fim ]] && rm $HOME/fim
+        ${CMD[0]} >/dev/null 2>&1
+        ${CMD[1]} >/dev/null 2>&1
+        touch $HOME/fim
+    ) >/dev/null 2>&1 &
+    tput civis
+    echo -ne "\033[0;33mPlease Wait Loading \033[1;37m- \033[0;33m["
+    while true; do
+        for ((i = 0; i < 18; i++)); do
+            echo -ne "\033[0;32m#"
+            sleep 0.1s
+        done
+        [[ -e $HOME/fim ]] && rm $HOME/fim && break
+        echo -e "\033[0;33m]"
+        sleep 1s
+        tput cuu1
+        tput dl1
+        echo -ne "\033[0;33mPlease Wait Loading \033[1;37m- \033[0;33m["
     done
-    
-    # Wait for process to complete
-    wait "$pid"
-    
-    # Clean up
-    rm -f "$temp_file"
-    printf "\r${OK} Completed successfully!                          \n"
+    echo -e "\033[0;33m]\033[1;37m -\033[1;32m OK !\033[1;37m"
+    tput cnorm
 }
 
 # Safety Check Function
 check_safety() {
-    echo -e "\033[0;36mChecking connection and file integrity...\033[0m"
+    echo -e "\033[0;36mChecking connection and repository...\033[0m"
     
     # Check internet connection
-    if ! ping -c1 -W2 github.com >/dev/null 2>&1; then
+    ping -c1 github.com >/dev/null 2>&1 || {
         echo -e "${ERROR} No internet connection!"
         return 1
-    fi
+    }
     
-    # Check if file exists on GitHub
-    echo -e "${OK} Verifying update source..."
-    if ! wget -q --spider --timeout=10 "https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip"; then
-        echo -e "${ERROR} menu.zip not found on GitHub!"
+    # Check if your repository is accessible
+    wget -q --spider "${YOUR_UPLOAD_REPO}/menu/menu.zip" || {
+        echo -e "${ERROR} Repository not accessible!"
+        echo -e "${ERROR} Please check: ${YOUR_UPLOAD_REPO}/menu/menu.zip"
         return 1
-    fi
-    
-    # Download the file
-    echo -e "${OK} Downloading update package..."
-    if ! wget -q --timeout=30 -O menu.zip "https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip"; then
-        echo -e "${ERROR} Failed to download menu.zip!"
-        return 1
-    fi
-    
-    # Check file size
-    local SIZE=0
-    if [[ -f "menu.zip" ]]; then
-        SIZE=$(stat -c%s "menu.zip" 2>/dev/null || echo "0")
-    fi
-    
-    if [[ $SIZE -lt 50000 ]]; then
-        echo -e "${ERROR} Invalid or corrupted menu.zip! (Size: ${SIZE} bytes)"
-        rm -f menu.zip
-        return 1
-    fi
-    
-    echo -e "${OK} File verified successfully. (Size: ${SIZE} bytes)"
+    }
+    echo -e "${OK} Repository verified successfully."
     return 0
 }
 
 # Main Update Function
-perform_update() {
-    echo -e "${OK} Starting update process..."
-    
-    # Run safety check
-    if ! check_safety; then
-        echo -e "${ERROR} Safety check failed! Update aborted."
+res1() {
+    # Run safety check first
+    check_safety || {
+        echo -e "${ERROR} Safety check failed!"
         return 1
-    fi
+    }
     
-    # Create backup
-    echo -e "${OK} Creating backup..."
-    local backup_dir="/root/backup_$(date +%Y%m%d_%H%M%S)"
-    mkdir -p "$backup_dir"
+    # Download from your repository
+    echo -e "${OK} Downloading from your repository..."
+    wget -q "${YOUR_UPLOAD_REPO}/menu/menu.zip" -O menu.zip || {
+        echo -e "${ERROR} Failed to download menu.zip!"
+        return 1
+    }
     
-    # Backup existing menu files
-    if [[ -d "/usr/local/sbin" ]]; then
-        cp -r /usr/local/sbin/* "$backup_dir/" 2>/dev/null
-        echo -e "${OK} Backup created in: $backup_dir"
+    # Check file size
+    SIZE=$(stat -c%s "menu.zip" 2>/dev/null || echo "0")
+    if [[ $SIZE -lt 50000 ]]; then
+        echo -e "${ERROR} Invalid file size: ${SIZE} bytes"
+        rm -f menu.zip
+        return 1
     fi
     
     # Extract files
     echo -e "${OK} Extracting files..."
-    if ! unzip -oq menu.zip; then
+    unzip -oq menu.zip || {
         echo -e "${ERROR} Failed to extract menu.zip!"
         return 1
-    fi
+    }
     
     # Check if menu directory exists
     if [[ ! -d "menu" ]]; then
-        echo -e "${ERROR} 'menu' directory not found in zip file!"
+        echo -e "${ERROR} Menu directory not found!"
         return 1
     fi
     
-    # Check if there are files in menu directory
-    if [[ -z "$(ls -A menu/ 2>/dev/null)" ]]; then
-        echo -e "${ERROR} No files found in menu directory!"
-        return 1
-    fi
-    
-    # Set execution permissions
+    # Set permissions and install
     echo -e "${OK} Setting permissions..."
-    chmod +x menu/* 2>/dev/null
+    chmod +x menu/*
     
-    # Ensure target directory exists
+    echo -e "${OK} Installing files..."
     mkdir -p /usr/local/sbin/
+    mv menu/* /usr/local/sbin/
     
-    # Copy files to destination
-    echo -e "${OK} Installing updates..."
-    if ! cp -r menu/* /usr/local/sbin/ 2>/dev/null; then
-        echo -e "${ERROR} Failed to copy files to /usr/local/sbin/"
-        return 1
-    fi
+    # Cleanup
+    echo -e "${OK} Cleaning up..."
+    rm -rf menu
+    rm -f menu.zip
     
-    # Set permissions for all copied files
-    chmod +x /usr/local/sbin/* 2>/dev/null
-    
-    # Clean up temporary files
-    echo -e "${OK} Cleaning up temporary files..."
-    rm -rf menu menu.zip
-    
-    # Reload systemd services
+    # Reload systemd
     systemctl daemon-reload 2>/dev/null
     
-    echo -e "${OK} Update process completed successfully!"
+    echo -e "${OK} Update completed successfully!"
     return 0
 }
 
-# Check and reload netfilter-persistent
-reload_netfilter() {
+# Reload netfilter-persistent if available
+reload_firewall() {
     if command -v netfilter-persistent &>/dev/null; then
-        echo -e "${OK} Reloading netfilter-persistent..."
+        echo -e "${OK} Reloading firewall rules..."
         netfilter-persistent reload >/dev/null 2>&1
     fi
 }
 
-# Check if lolcat is available, if not use fallback
-safe_lolcat() {
-    if command -v lolcat &>/dev/null; then
-        echo "$1" | lolcat
-    else
-        echo "$1"
+# Check if lolcat is available
+check_lolcat() {
+    if ! command -v lolcat &>/dev/null; then
+        echo -e "${YELLOW}[INFO] Installing lolcat for better display...${NC}"
+        apt-get update >/dev/null 2>&1
+        apt-get install -y ruby >/dev/null 2>&1
+        gem install lolcat >/dev/null 2>&1
     fi
 }
 
 # Main Execution
 clear
-
-# Display header
-safe_lolcat "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "\e[1;97;101m            » UPDATE SCRIPT «             \033[0m"
-safe_lolcat "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "\033[1;91mUpdating North Africa Script Service\033[1;37m"
-echo -e ""
 
 # Check root privileges
 if [[ $EUID -ne 0 ]]; then
@@ -200,83 +159,54 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Check if we can install lolcat if missing
-if ! command -v lolcat &>/dev/null; then
-    echo -e "${YELLOW}[INFO] lolcat not found, using plain text display${NC}"
-fi
+# Install lolcat if needed
+check_lolcat
 
-# Execute update with simple progress
-echo -e "${OK} Starting update process..."
-if perform_update; then
-    echo -e "\033[1;92m✅ Update Completed Successfully!\033[0m"
-else
-    echo -e "\033[1;91m❌ Update Failed!\033[0m"
-    exit 1
-fi
+# Display header
+echo -e ""
+echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+echo -e "\e[1;97;101m            » UPDATE SCRIPT «             \033[0m"
+echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+echo -e ""
+echo -e "\033[1;91mUpdate North Africa Script Service\033[1;37m"
 
-# Reload netfilter-persistent after update
-reload_netfilter
+# Execute update
+fun_bar 'res1'
 
-# Display completion message
-safe_lolcat "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Reload firewall
+reload_firewall
+
+# Display completion
+echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
 echo -e ""
 echo -e "\033[1;92m✅ Update Completed Successfully!\033[0m"
 echo -e ""
-echo -e "\033[1;94m📊 Update Summary:\033[0m"
-echo -e "   ${OK} Files downloaded and verified"
-echo -e "   ${OK} Backup created successfully" 
-echo -e "   ${OK} Permissions set correctly"
-echo -e "   ${OK} System services reloaded"
+echo -e "\033[1;94m📊 Repository Information:\033[0m"
+echo -e "   ${OK} Main Repo: ${YOUR_REPO}"
+echo -e "   ${OK} Upload Repo: ${YOUR_UPLOAD_REPO}"
 echo -e ""
-echo -e "\033[1;93m🔧 Services Status:\033[0m"
+echo -e "\033[1;96m📢 Contact Information:\033[0m"
+echo -e "   🌐 Channel: https://t.me/NorthAfrica_Channel"
+echo -e "   👥 Group: https://t.me/NorthAfrica_Group"
+echo -e "   🤖 Bot: @NorthSSHAfrica5_bot"
+echo -e "   👤 Admin: @Abdulsalam403"
+echo -e ""
 
-# Check and display service status
+# Restart services if they exist
+echo -e "\033[1;93m🔄 Restarting services...\033[0m"
 services=("xray" "nginx" "haproxy")
 for service in "${services[@]}"; do
     if systemctl is-active "$service" >/dev/null 2>&1; then
-        echo -e "   ${OK} $service: ${Green}Active${NC}"
-    elif systemctl is-enabled "$service" >/dev/null 2>&1; then
-        echo -e "   ${OK} $service: ${YELLOW}Enabled but not running${NC}"
-    else
-        echo -e "   ${ERROR} $service: ${RED}Not available${NC}"
-    fi
-done
-
-echo -e ""
-echo -e "\033[1;96m📢 Join Our Community:\033[0m"
-echo -e "   🌐 Channel: https://t.me/NorthAfrica_Channel"
-echo -e "   👥 Group:   https://t.me/NorthAfrica_Group"
-echo -e "   🤖 Bot:     @NorthSSHAfrica5_bot"
-echo -e ""
-echo -e "\033[1;95m💡 Need Help?\033[0m"
-echo -e "   Contact: @Abdulsalam403"
-echo -e ""
-
-# Restart related services if they exist
-echo -e "\033[1;93m🔄 Restarting related services...\033[0m"
-for service in "${services[@]}"; do
-    if systemctl list-unit-files | grep -q "$service.service" && systemctl is-active "$service" >/dev/null 2>&1; then
-        if systemctl restart "$service" >/dev/null 2>&1; then
-            echo -e "   ${OK} $service service restarted"
-        else
-            echo -e "   ${ERROR} Failed to restart $service"
-        fi
+        systemctl restart "$service" >/dev/null 2>&1 && \
+        echo -e "   ${OK} $service restarted" || \
+        echo -e "   ${ERROR} Failed to restart $service"
     fi
 done
 
 sleep 2
 
-# Return to main menu if available
+# Return to menu
 echo -e ""
-if command -v menu &>/dev/null; then
-    echo -e "\033[1;92m🎯 Returning to main menu...\033[0m"
-    read -p "$(echo -e "Press ${Green}Enter${NC} to continue to main menu or ${RED}Ctrl+C${NC} to exit") "
-    clear
-    menu
-else
-    echo -e "\033[1;93m⚠️  Note: Main menu command not found\033[0m"
-    echo -e "${OK} Update completed. You can run scripts from /usr/local/sbin/"
-    echo -e ""
-    read -p "$(echo -e "Press ${Green}Enter${NC} to exit") "
-    clear
-fi
+read -n 1 -s -r -p "Press [ Enter ] To Back On Menu"
+clear
+menu
