@@ -284,8 +284,7 @@ restart_system(){
     echo -e "\e[32mloading...\e[0m"
     clear
 
-    # license / register file in your repo
-    izinsc="${REPO}register"
+    # izinsc="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/register"
 
     # USERNAME
     rm -f /usr/bin/user
