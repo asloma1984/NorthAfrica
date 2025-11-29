@@ -1,14 +1,12 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # System Request : Debian 9+/Ubuntu 18.04+/20+
-# Develovers  » Tøxic savage࿐
-# Email       » johntezali56@gmail.com
-# telegram    » https://t.me/ToxicSavage
-# whatsapp    » wa.me/+254716637803
+# Developer  » North Africa Team
 #
 # Personal TG » @Abdulsalam403
 # Bot         » @NorthSSHAfrica5_bot
-# Channel     » https://t.me/northafrica9
+# Channel     » https://t.me/NorthAfrica_Channel
+# Group       » https://t.me/NorthAfrica_Group
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 clear
@@ -40,7 +38,7 @@ fun_bar() {
     tput cnorm
 }
 
-# 🔐 دالة التحقق من الاتصال وسلامة الملف
+# 🔐 Function to check internet connection and file integrity
 check_safety() {
     echo -e "\033[0;36mChecking connection and file integrity...\033[0m"
     ping -c1 github.com >/dev/null 2>&1 || {
@@ -55,7 +53,7 @@ check_safety() {
 
     wget -q -O menu.zip https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip
 
-    # 🔍 تحقق من حجم الملف (أكثر من 50KB يعني ملف حقيقي)
+    # 🔍 Check file size (must be larger than 50KB to be valid)
     SIZE=$(stat -c%s "menu.zip")
     if [[ $SIZE -lt 50000 ]]; then
         echo -e "\033[0;31m[ERROR]\033[0m Invalid or corrupted menu.zip!"
@@ -83,7 +81,7 @@ echo -e "\e[1;97;101m            » UPDATE SCRIPT «             \033[0m"
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
 echo -e ""
 echo -e "\033[1;91mUpdate North Africa Script Service\033[1;37m"
-fun_bar 'res1'
+fun_bar 'res1' 'sleep 1'
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
 echo -e ""
 read -n 1 -s -r -p "Press [ Enter ] To Back On Menu"
