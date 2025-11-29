@@ -38,51 +38,45 @@ fun_bar() {
     tput cnorm
 }
 
-# 🔐 Function to check internet connection and file integrity
 check_safety() {
     echo -e "\033[0;36mChecking connection and file integrity...\033[0m"
     ping -c1 github.com >/dev/null 2>&1 || {
         echo -e "\033[0;31m[ERROR]\033[0m No internet connection!"
         exit 1
     }
-
     wget -q --spider https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip || {
         echo -e "\033[0;31m[ERROR]\033[0m menu.zip not found on GitHub!"
         exit 1
     }
-
     wget -q -O menu.zip https://raw.githubusercontent.com/NorthAfrica/upload/main/menu/menu.zip
-
-    # 🔍 Check file size (must be larger than 50KB to be valid)
     SIZE=$(stat -c%s "menu.zip")
     if [[ $SIZE -lt 50000 ]]; then
         echo -e "\033[0;31m[ERROR]\033[0m Invalid or corrupted menu.zip!"
         rm -f menu.zip
         exit 1
     fi
-
     echo -e "\033[1;32mFile verified successfully.\033[0m"
 }
 
 res1() {
-    check_safety
-    unzip -oq menu.zip
-    chmod +x menu/*
-    mv menu/* /usr/local/sbin/
+    check_safety || return 1
+    unzip -oq menu.zip || return 1
+    chmod +x menu/* || return 1
+    mv menu/* /usr/local/sbin/ || return 1
     rm -rf menu menu.zip update.sh
 }
 
 netfilter-persistent
 clear
-
-echo -e ""
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
 echo -e "\e[1;97;101m            » UPDATE SCRIPT «             \033[0m"
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
-echo -e ""
 echo -e "\033[1;91mUpdate North Africa Script Service\033[1;37m"
 fun_bar 'res1' 'sleep 1'
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
 echo -e ""
-read -n 1 -s -r -p "Press [ Enter ] To Back On Menu"
+echo -e "\033[1;36m✅ Join our Telegram Channel for Updates:\033[0m"
+echo -e "📢 https://t.me/NorthAfrica_Channel"
+echo -e "💬 https://t.me/NorthAfrica_Group"
+sleep 2
 menu
