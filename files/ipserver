@@ -1,12 +1,13 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # System Request : Debian 9+/Ubuntu 18.04+/20+
-# Develovers » Gemilangkinasih࿐
-# Email      » gemilangkinasih@gmail.com
-# telegram   » https://t.me/gemilangkinasih
-# whatsapp   » wa.me/+628984880039
+# Developer  » Abdul NorthAfrica࿐
+# Email      » yourmail@example.com
+# Telegram   » https://t.me/YourChannel
+# Group      » https://t.me/YourGroup
+# Whatsapp   » wa.me/+212600000000
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Gemilangkinasih࿐
+# Abdul NorthAfrica࿐
 
 interface=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 cat >/etc/iptables/rules.v4 <<-END
