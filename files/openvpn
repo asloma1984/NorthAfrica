@@ -1,158 +1,246 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9+/Ubuntu 18.04+/20+
-# Developer  : NORTH AFRICA TEAM
-# Email      : Aslomaking1984@gmail.com
-# Telegram   : https://t.me/northafrica9
-# Telegram Group : https://t.me/groupnorthafrica
+# North Africa OpenVPN Installer
+# System Request : Debian 9+/Ubuntu 18+
+# Developer      : NORTH AFRICA TEAM
+# Telegram       : https://t.me/northafrica9
+# Group          : https://t.me/groupnorthafrica
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export DEBIAN_FRONTEND=noninteractive
-OS=`uname -m`;
-MYIP=$(wget -qO- ipinfo.io/ip);
-domain=$(cat /root/domain)
-#MYIP2="s/xxxxxxxxx/$MYIP/g";
-MYIP2="s/xxxxxxxxx/$domain/g";
 
-function ovpn_install() {
-    rm -rf /etc/openvpn
-    mkdir -p /etc/openvpn
-    wget -O /etc/openvpn/vpn.zip "https://raw.githubusercontent.com/jaka1m/project/main/ssh/vpn.zip" >/dev/null 2>&1 
-    unzip -d /etc/openvpn/ /etc/openvpn/vpn.zip
-    rm -f /etc/openvpn/vpn.zip
-    chown -R root:root /etc/openvpn/server/easy-rsa/
-}
-function config_easy() {
-    cd
-    mkdir -p /usr/lib/openvpn/
-    cp /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so /usr/lib/openvpn/openvpn-plugin-auth-pam.so
-    sed -i 's/#AUTOSTART="all"/AUTOSTART="all"/g' /etc/default/openvpn
-    systemctl enable --now openvpn-server@server-tcp
-    systemctl enable --now openvpn-server@server-udp
-    /etc/init.d/openvpn restart
-}
+# Detect system information
+MYIP=$(curl -sS ipv4.icanhazip.com)
+DOMAIN_FILE="/root/domain"
+if [[ -f "$DOMAIN_FILE" ]]; then
+    DOMAIN=$(cat /root/domain)
+else
+    DOMAIN="$MYIP"
+fi
+REPLACE_DOMAIN="s/xxxxxxxxx/$DOMAIN/g"
 
-function make_follow() {
-    echo 1 > /proc/sys/net/ipv4/ip_forward
-    sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
-cat > /etc/openvpn/tcp.ovpn <<-END
+echo ""
+echo "=========================================="
+echo "     North Africa – OpenVPN Installer     "
+echo "=========================================="
+echo "Server IP    : $MYIP"
+echo "Domain Used  : $DOMAIN"
+echo "=========================================="
+sleep 2
+
+# ---------------------------------------------------
+# 1. Install packages
+# ---------------------------------------------------
+echo "[1] Installing required packages..."
+apt update -y >/dev/null 2>&1
+apt install -y openvpn easy-rsa zip unzip nginx iptables-persistent >/dev/null 2>&1
+
+# ---------------------------------------------------
+# 2. Setup directories
+# ---------------------------------------------------
+echo "[2] Preparing OpenVPN directories..."
+rm -rf /etc/openvpn
+mkdir -p /etc/openvpn/server
+mkdir -p /etc/openvpn/client
+
+# ---------------------------------------------------
+# 3. Setup Easy-RSA PKI (Certificates)
+# ---------------------------------------------------
+echo "[3] Generating certificates..."
+
+EASYRSA_DIR="/etc/openvpn/server/easy-rsa"
+mkdir -p $EASYRSA_DIR
+cp -r /usr/share/easy-rsa/* $EASYRSA_DIR/
+
+cd $EASYRSA_DIR
+export EASYRSA_BATCH=1
+export EASYRSA_PKI="$EASYRSA_DIR/pki"
+
+./easyrsa init-pki >/dev/null 2>&1
+./easyrsa build-ca nopass >/dev/null 2>&1
+./easyrsa gen-dh >/dev/null 2>&1
+./easyrsa build-server-full server nopass >/dev/null 2>&1
+./easyrsa gen-crl >/dev/null 2>&1
+
+# Copy keys
+cp $EASYRSA_PKI/ca.crt              /etc/openvpn/server/
+cp $EASYRSA_PKI/issued/server.crt   /etc/openvpn/server/
+cp $EASYRSA_PKI/private/server.key  /etc/openvpn/server/
+cp $EASYRSA_PKI/dh.pem              /etc/openvpn/server/
+cp $EASYRSA_PKI/crl.pem             /etc/openvpn/server/
+
+chmod 600 /etc/openvpn/server/server.key
+
+# ---------------------------------------------------
+# 4. Create OpenVPN Server Configs (TCP / UDP)
+# ---------------------------------------------------
+echo "[4] Creating server configuration..."
+
+# TCP
+cat > /etc/openvpn/server/server-tcp.conf <<EOF
+port 1194
+proto tcp
+dev tun
+server 10.8.0.0 255.255.255.0
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 1.1.1.1"
+push "dhcp-option DNS 1.0.0.1"
+persist-key
+persist-tun
+keepalive 10 120
+ca ca.crt
+cert server.crt
+key server.key
+dh dh.pem
+crl-verify crl.pem
+cipher AES-256-CBC
+auth SHA256
+compress lz4-v2
+status /var/log/openvpn-status-tcp.log
+verb 3
+EOF
+
+# UDP
+cat > /etc/openvpn/server/server-udp.conf <<EOF
+port 2200
+proto udp
+dev tun
+server 10.9.0.0 255.255.255.0
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 1.1.1.1"
+push "dhcp-option DNS 1.0.0.1"
+persist-key
+persist-tun
+keepalive 10 120
+ca ca.crt
+cert server.crt
+key server.key
+dh dh.pem
+crl-verify crl.pem
+cipher AES-256-CBC
+auth SHA256
+compress lz4-v2
+status /var/log/openvpn-status-udp.log
+verb 3
+EOF
+
+# ---------------------------------------------------
+# 5. Enable IP Forwarding & NAT
+# ---------------------------------------------------
+echo "[5] Enabling IP forwarding..."
+
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p >/dev/null 2>&1
+
+# Detect network interface
+IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n1)
+
+# NAT
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $IFACE -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o $IFACE -j MASQUERADE
+
+netfilter-persistent save >/dev/null 2>&1
+
+# ---------------------------------------------------
+# 6. Create Client Files (.ovpn)
+# ---------------------------------------------------
+echo "[6] Generating client configuration files..."
+
+# TCP Client
+cat > /etc/openvpn/client/tcp.ovpn <<EOF
 client
 dev tun
 proto tcp
 remote xxxxxxxxx 1194
 resolv-retry infinite
-route-method exe
 nobind
 persist-key
 persist-tun
 auth-user-pass
-comp-lzo
+cipher AES-256-CBC
+auth SHA256
+compress lz4-v2
 verb 3
-END
-    
-    sed -i $MYIP2 /etc/openvpn/tcp.ovpn;
-cat > /etc/openvpn/udp.ovpn <<-END
+
+<ca>
+EOF
+sed -i $REPLACE_DOMAIN /etc/openvpn/client/tcp.ovpn
+cat /etc/openvpn/server/ca.crt >> /etc/openvpn/client/tcp.ovpn
+echo "</ca>" >> /etc/openvpn/client/tcp.ovpn
+
+# UDP Client
+cat > /etc/openvpn/client/udp.ovpn <<EOF
 client
 dev tun
 proto udp
 remote xxxxxxxxx 2200
 resolv-retry infinite
-route-method exe
 nobind
 persist-key
 persist-tun
 auth-user-pass
-comp-lzo
+cipher AES-256-CBC
+auth SHA256
+compress lz4-v2
 verb 3
-END
-    
-    sed -i $MYIP2 /etc/openvpn/udp.ovpn;
-cat > /etc/openvpn/ws-ssl.ovpn <<-END
-client
-dev tun
-proto tcp
-remote xxxxxxxxx 443
-resolv-retry infinite
-route-method exe
-nobind
-persist-key
-persist-tun
-auth-user-pass
-comp-lzo
-verb 3
-END
-    sed -i $MYIP2 /etc/openvpn/ws-ssl.ovpn;
-cat > /etc/openvpn/ssl.ovpn <<-END
-client
-dev tun
-proto tcp
-remote xxxxxxxxx 443
-resolv-retry infinite
-route-method exe
-nobind
-persist-key
-persist-tun
-auth-user-pass
-comp-lzo
-verb 3
-END
-    sed -i $MYIP2 /etc/openvpn/ssl.ovpn;
-}
-function cert_ovpn() {
-    echo '<ca>' >> /etc/openvpn/tcp.ovpn
-    cat /etc/openvpn/server/ca.crt >> /etc/openvpn/tcp.ovpn
-    echo '</ca>' >> /etc/openvpn/tcp.ovpn
-    cp /etc/openvpn/tcp.ovpn /var/www/html/tcp.ovpn
-    echo '<ca>' >> /etc/openvpn/udp.ovpn
-    cat /etc/openvpn/server/ca.crt >> /etc/openvpn/udp.ovpn
-    echo '</ca>' >> /etc/openvpn/udp.ovpn
-    cp /etc/openvpn/udp.ovpn /var/www/html/udp.ovpn
-    echo '<ca>' >> /etc/openvpn/ws-ssl.ovpn
-    cat /etc/openvpn/server/ca.crt >> /etc/openvpn/ws-ssl.ovpn
-    echo '</ca>' >> /etc/openvpn/ws-ssl.ovpn
-    cp /etc/openvpn/ws-ssl.ovpn /var/www/html/ws-ssl.ovpn
-    echo '</ca>' >> /etc/openvpn/ssl.ovpn
-    cp /etc/openvpn/ws-ssl.ovpn /var/www/html/ssl.ovpn
-    
-# Delete script
- 
-cd /var/www/html/
-zip Kyt-Project.zip tcp.ovpn udp.ovpn ssl.ovpn ws-ssl.ovpn > /dev/null 2>&1
-cd
-cat <<'mySiteOvpn' > /var/www/html/index.html
-<!DOCTYPE html>
-<html lang="en">
 
-<!-- Simple OVPN Download site -->
+<ca>
+EOF
+sed -i $REPLACE_DOMAIN /etc/openvpn/client/udp.ovpn
+cat /etc/openvpn/server/ca.crt >> /etc/openvpn/client/udp.ovpn
+echo "</ca>" >> /etc/openvpn/client/udp.ovpn
 
-<head><meta charset="utf-8" /><title>OVPN Config Download</title><meta name="description" content="Server" /><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" /><meta name="theme-color" content="#000000" /><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css"><link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"><link href="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.8.3/css/mdb.min.css" rel="stylesheet"></head><body><div class="container justify-content-center" style="margin-top:9em;margin-bottom:5em;"><div class="col-md"><div class="view"><img src="https://openvpn.net/wp-content/uploads/openvpn.jpg" class="card-img-top"><div class="mask rgba-white-slight"></div></div><div class="card"><div class="card-body"><h5 class="card-title">Config List</h5><br /><ul class="list-group">
+# Duplicate for ssl & ws-ssl
+cp /etc/openvpn/client/tcp.ovpn /etc/openvpn/client/ssl.ovpn
+cp /etc/openvpn/client/tcp.ovpn /etc/openvpn/client/ws-ssl.ovpn
 
-<li class="list-group-item justify-content-between align-items-center" style="margin-bottom:1em;"><p>TCP <span class="badge light-blue darken-4">Android/iOS/PC/Modem</span><br /><small></small></p><a class="btn btn-outline-success waves-effect btn-sm" href="https://IP-ADDRESSS:81/tcp.ovpn" style="float:right;"><i class="fa fa-download"></i> Download</a></li>
+# Copy to nginx web folder
+cp /etc/openvpn/client/*.ovpn /var/www/html/
 
-<li class="list-group-item justify-content-between align-items-center" style="margin-bottom:1em;"><p>UDP <span class="badge light-blue darken-4">Android/iOS/PC/Modem</span><br /><small></small></p><a class="btn btn-outline-success waves-effect btn-sm" href="https://IP-ADDRESSS:81/udp.ovpn" style="float:right;"><i class="fa fa-download"></i> Download</a></li>
+cd /var/www/html
+zip NorthAfrica-OVPN.zip *.ovpn >/dev/null 2>&1
 
-<li class="list-group-item justify-content-between align-items-center" style="margin-bottom:1em;"><p>SSL <span class="badge light-blue darken-4">Android/iOS/PC/Modem</span><br /><small></small></p><a class="btn btn-outline-success waves-effect btn-sm" href="https://IP-ADDRESSS:81/ssl.ovpn" style="float:right;"><i class="fa fa-download"></i> Download</a></li>
+# ---------------------------------------------------
+# 7. Create HTML Download Page
+# ---------------------------------------------------
+echo "[7] Creating download page..."
 
-<li class="list-group-item justify-content-between align-items-center" style="margin-bottom:1em;"><p> WS SSL <span class="badge light-blue darken-4">Android/iOS/PC/Modem</span><br /><small></small></p><a class="btn btn-outline-success waves-effect btn-sm" href="https://IP-ADDRESSS:81/ws-ssl.ovpn" style="float:right;"><i class="fa fa-download"></i> Download</a></li>
+cat > /var/www/html/index.html <<EOF
+<html>
+<head>
+<title>North Africa OpenVPN Config</title>
+</head>
+<body>
+<h2>Download OpenVPN Config Files</h2>
+<ul>
+<li><a href="https://$DOMAIN:81/tcp.ovpn">TCP 1194</a></li>
+<li><a href="https://$DOMAIN:81/udp.ovpn">UDP 2200</a></li>
+<li><a href="https://$DOMAIN:81/ssl.ovpn">SSL 443</a></li>
+<li><a href="https://$DOMAIN:81/ws-ssl.ovpn">WS SSL 443</a></li>
+<li><a href="https://$DOMAIN:81/NorthAfrica-OVPN.zip">ALL (ZIP)</a></li>
+</ul>
+</body>
+</html>
+EOF
 
-<li class="list-group-item justify-content-between align-items-center" style="margin-bottom:1em;"><p> ALL.zip <span class="badge light-blue darken-4">Android/iOS/PC/Modem</span><br /><small></small></p><a class="btn btn-outline-success waves-effect btn-sm" href="https://IP-ADDRESSS:81/Kyt-Project.zip" style="float:right;"><i class="fa fa-download"></i> Download</a></li>
+# ---------------------------------------------------
+# 8. Enable & Start Services
+# ---------------------------------------------------
+echo "[8] Starting OpenVPN services..."
 
-</ul></div></div></div></div></body></html>
-mySiteOvpn
+systemctl enable openvpn-server@server-tcp
+systemctl enable openvpn-server@server-udp
 
-sed -i "s|IP-ADDRESSS|$(curl -sS ifconfig.me)|g" /var/www/html/index.html
+systemctl restart openvpn-server@server-tcp
+systemctl restart openvpn-server@server-udp
 
-}
+systemctl restart nginx
 
-function install_ovpn() {
-    ovpn_install
-    config_easy
-    make_follow
-    make_follow
-    cert_ovpn
-    systemctl enable openvpn
-    systemctl start openvpn
-    /etc/init.d/openvpn restart
-    
-}
-install_ovpn
+echo "=========================================="
+echo "     OpenVPN Installed Successfully!       "
+echo "=========================================="
+echo "TCP Port     : 1194"
+echo "UDP Port     : 2200"
+echo "Download OVPN files at:"
+echo "https://$DOMAIN:81/"
+echo "=========================================="
