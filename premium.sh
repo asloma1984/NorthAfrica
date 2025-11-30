@@ -222,12 +222,14 @@ function base_package() {
     apt install figlet -y
     apt upgrade -y
     apt dist-upgrade -y
-    systemctl enable chronyd
-    systemctl restart chronyd
+    
+    # Install chrony properly
+    apt install chrony -y
     systemctl enable chrony
     systemctl restart chrony
     chronyc sourcestats -v
     chronyc tracking -v
+    
     apt install ntpdate -y
     ntpdate pool.ntp.org
     apt install sudo -y
@@ -254,7 +256,7 @@ function base_package() {
         netfilter-persistent net-tools openssl ca-certificates \
         gnupg gnupg2 ca-certificates lsb-release gcc shc make \
         cmake git screen socat xz-utils apt-transport-https \
-        gnupg1 dnsutils cron bash-completion ntpdate chrony jq \
+        gnupg1 dnsutils cron bash-completion ntpdate jq \
         openvpn easy-rsa
     
     print_success "Required packages"
@@ -502,9 +504,65 @@ function install_xray() {
     curl -s ipinfo.io/city >>/etc/xray/city
     curl -s ipinfo.io/org | cut -d " " -f 2-10 >>/etc/xray/isp
     print_install "Install packet configuration"
-    wget -O /etc/haproxy/haproxy.cfg "${REPO}config/haproxy.cfg" >/dev/null 2>&1
+    
+    # Create reliable HAProxy configuration
+    cat > /etc/haproxy/haproxy.cfg << 'EOF'
+global
+    daemon
+    maxconn 2000
+    user haproxy
+    group haproxy
+    log /dev/log local0
+    log /dev/log local1 notice
+
+defaults
+    mode tcp
+    log global
+    option tcplog
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+    option dontlognull
+
+frontend ssl-frontend
+    bind *:443
+    default_backend ssh-backend
+
+frontend http-frontend
+    bind *:80
+    default_backend ssh-backend
+
+backend ssh-backend
+    server ssh-server 127.0.0.1:22 maxconn 100 check
+EOF
+
+    # Verify HAProxy configuration
+    if haproxy -c -f /etc/haproxy/haproxy.cfg; then
+        echo "HAProxy configuration is valid"
+    else
+        echo "Creating fallback HAProxy configuration"
+        cat > /etc/haproxy/haproxy.cfg << 'FALLBACK'
+global
+    daemon
+    maxconn 2000
+
+defaults
+    mode tcp
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend main
+    bind *:80
+    bind *:443
+    default_backend ssh
+
+backend ssh
+    server ssh1 127.0.0.1:22 check
+FALLBACK
+    fi
+
     wget -O /etc/nginx/conf.d/xray.conf "${REPO}config/xray.conf" >/dev/null 2>&1
-    sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     curl ${REPO}config/nginx.conf > /etc/nginx/nginx.conf
 
