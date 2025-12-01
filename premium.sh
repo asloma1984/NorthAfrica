@@ -7,6 +7,7 @@
 #
 # Developer » Abdul ( Stable Edition )
 # Recode by North Africa (2025)
+# All rights reserved to asloma1984 (GitHub)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Green="\e[92;1m"
@@ -56,8 +57,8 @@ else
 fi
 
 # // Checking System
-OS_ID=$(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g')
-OS_NAME=$(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')
+OS_ID=$(grep -w ID /etc/os-release | head -n1 | sed 's/ID=//g' | sed 's/"//g')
+OS_NAME=$(grep -w PRETTY_NAME /etc/os-release | head -n1 | sed 's/PRETTY_NAME=//g' | sed 's/"//g')
 
 if [[ $OS_ID == "ubuntu" ]]; then
     echo -e "${OK} Your OS is supported ( ${green}${OS_NAME}${NC} )"
@@ -75,9 +76,79 @@ else
     echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
 
+#-------------------------------------------------------------------------------
+#  LICENSE / REGISTER CHECK (PRIVATE)
+#-------------------------------------------------------------------------------
+MYIP=$(curl -sS ipv4.icanhazip.com)
+LICENSE_URL="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/register"
+
+license_denied_not_registered() {
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  echo -e "\033[41;97m              404 NOT FOUND AUTOSCRIPT              \033[0m"
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  echo -e ""
+  echo -e "          ${RED}PERMISSION DENIED!${NC}"
+  echo -e "   Your VPS ${YELLOW}$MYIP${NC} is not registered."
+  echo -e "   Please contact the developer for activation:"
+  echo -e ""
+  echo -e "          Telegram: ${green}t.me/Abdulsalam403${NC}"
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  exit 1
+}
+
+license_denied_expired() {
+  local exp_date="$1"
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  echo -e "\033[41;97m              404 NOT FOUND AUTOSCRIPT              \033[0m"
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  echo -e ""
+  echo -e "          ${RED}PERMISSION DENIED!${NC}"
+  echo -e "   Your license for VPS ${YELLOW}$MYIP${NC} has expired."
+  echo -e "   Expiration date : ${YELLOW}$exp_date${NC}"
+  echo -e "   Please contact the developer for renewal:"
+  echo -e ""
+  echo -e "          Telegram: ${green}t.me/Abdulsalam403${NC}"
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  exit 1
+}
+
+license_check() {
+  local data line
+  data=$(curl -fsSL "$LICENSE_URL") || {
+    echo -e "${ERROR} Unable to fetch license data from register."
+    license_denied_not_registered
+  }
+
+  # Assume last field is IP, field2 = username, field3 = expiry (YYYY-MM-DD)
+  line=$(echo "$data" | awk -v ip="$MYIP" '$NF==ip {print}')
+  if [[ -z "$line" ]]; then
+    license_denied_not_registered
+  fi
+
+  USERNAME=$(echo "$line" | awk '{print $2}')
+  EXP_DATE=$(echo "$line" | awk '{print $3}')
+
+  today=$(date +%Y-%m-%d)
+
+  if [[ "$today" > "$EXP_DATE" ]]; then
+    license_denied_expired "$EXP_DATE"
+  fi
+
+  # Save to system files used by menu etc.
+  rm -f /usr/bin/user /usr/bin/e
+  echo "$USERNAME" >/usr/bin/user
+  echo "$EXP_DATE" >/usr/bin/e
+
+  echo -e "${OK} License OK for user ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
+}
+
+# Run license check BEFORE starting heavy installation
+license_check
+#-------------------------------------------------------------------------------
+
 # // Validate Successful
 echo ""
-read -p "$(echo -e "Press ${GRAY}[ ${NC}${green}Enter${NC} ${GRAY}]${NC} to start installation ") "
+read -p "$(echo -e "Press ${GRAY}[ ${NC}${green}Enter${NC} ${GRAY}]${NC} to start installation ") " _
 echo ""
 clear
 
@@ -95,8 +166,6 @@ red='\e[1;31m'
 green='\e[0;32m'
 NC='\e[0m'
 
-# SCRIPT PERMISSION / IP
-MYIP=$(curl -sS ipv4.icanhazip.com)
 echo -e "\e[32mLoading...\e[0m"
 clear
 apt install ruby -y
@@ -104,7 +173,7 @@ gem install lolcat
 apt install wondershaper -y
 clear
 
-# REPO    
+# REPO (PRIVATE)
 REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/"
 
 ####
@@ -135,7 +204,7 @@ function print_success() {
     fi
 }
 
-### Check root
+### Check root (info only)
 function is_root() {
     if [[ 0 == "$UID" ]]; then
         print_ok "Root user - starting installation process"
@@ -270,7 +339,7 @@ function pasang_domain() {
         echo "$host1" > /root/domain
         echo ""
     elif [[ $host == "2" ]]; then
-        # install Cloudflare helper script
+        # install Cloudflare helper script from your repo
         wget ${REPO}files/cf.sh && chmod +x cf.sh && ./cf.sh
         rm -f /root/cf.sh
         clear
@@ -292,14 +361,17 @@ restart_system(){
     MYIP=$(curl -sS ipv4.icanhazip.com)
     echo -e "\e[32mLoading...\e[0m" 
     clear
-    izinsc="https://raw.githubusercontent.com/NorthAfrica/upload/main/register"
-    # USERNAME
+    izinsc="$LICENSE_URL"
+
+    # USERNAME & EXP (already saved earlier, but we refresh from register)
     rm -f /usr/bin/user
-    username=$(curl -s $izinsc | grep $MYIP | awk '{print $2}')
+    rm -f /usr/bin/e
+    line=$(curl -fsSL "$izinsc" | awk -v ip="$MYIP" '$NF==ip {print}')
+    username=$(echo "$line" | awk '{print $2}')
+    expx=$(echo "$line" | awk '{print $3}')
     echo "$username" >/usr/bin/user
-    expx=$(curl -s $izinsc | grep $MYIP | awk '{print $3}')
     echo "$expx" >/usr/bin/e
-    # DETAIL ORDER
+
     username=$(cat /usr/bin/user)
     oid=$(cat /usr/bin/ver 2>/dev/null)
     exp=$(cat /usr/bin/e)
@@ -311,7 +383,7 @@ restart_system(){
     Info="(${green}Active${NC})"
     ErrorInfo="(${RED}Expired${NC})"
     today=$(date -d "0 days" +"%Y-%m-%d")
-    Exp1=$(curl -s $izinsc | grep $MYIP | awk '{print $4}')
+    Exp1=$(echo "$line" | awk '{print $3}')
     if [[ $today < $Exp1 ]]; then
         sts="${Info}"
     else
@@ -319,27 +391,34 @@ restart_system(){
     fi
 
     TIMES="10"
-    CHATID="7000240664"
-    KEY="8023217597:AAEuON1fOkXGQnGdSu48H9J7eX2CHOV-gdA"
+
+    # Telegram Bot (PRIVATE)
+    CHATID="7850471388"
+    BOT_TOKEN_ID1="1234567890"
+    BOT_TOKEN_ID2=":AAHkjsdf9asdjklfjsdklfj"
+    KEY="${BOT_TOKEN_ID1}${BOT_TOKEN_ID2}"
+
     URL="https://api.telegram.org/bot$KEY/sendMessage"
     TIMEZONE=$(printf '%(%H:%M:%S)T')
 
-    TEXT="Instalasi Autoscript-vip V2.4
+    TEXT="NorthAfrica AutoScript Installation
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<code>Username   :</code> <code>$username</code>
-<code>Domain     :</code> <code>$domain</code>
-<code>IP Vps     :</code> <code>$MYIP</code>
-<code>ISP        :</code> <code>$ISP</code>
-<code>Timezone   :</code> <code>$TIMEZONE</code>
-<code>Location   :</code> <code>$CITY</code>
-<code>Exp Sc.    :</code> <code>$exp</code>
+Username   : $username
+Domain     : $domain
+IP VPS     : $MYIP
+ISP        : $ISP
+Timezone   : $TIMEZONE
+Location   : $CITY
+Script Exp : $exp
+Status     : $sts
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-By North Africa Script
+GitHub  : github.com/asloma1984/NorthAfrica
+Channel : @northafrica9
+Group   : @groupnorthafrica
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<i>Notifications Automatic From Github</i>
-"'&reply_markup={"inline_keyboard":[[{"text":"ᴏʀᴅᴇʀ","url":"https://t.me/groupnorthafrica"}]]}' 
+Automatic notification from private repo."
 
-    curl -s --max-time $TIMES -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" $URL >/dev/null
+    curl -s --max-time $TIMES -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" "$URL" >/dev/null
 }
 
 clear
@@ -418,7 +497,7 @@ function install_xray() {
     chown www-data.www-data $domainSock_dir
     
     # Get latest Xray core
-    latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\1/' | head -n 1)"
+    latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*\"v(.*)\".*/\1/' | head -n 1)"
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version $latest_version
  
     # Get server config
@@ -545,7 +624,8 @@ function password_default(){
 function udp_mini(){
     clear
     print_install "Install Service Limit IP & Quota"
-    wget -q https://raw.githubusercontent.com/NorthAfrica/upload/main/config/fv-tunnel && chmod +x fv-tunnel && ./fv-tunnel
+    # All from your private repo
+    wget -q "${REPO}config/fv-tunnel" -O fv-tunnel && chmod +x fv-tunnel && ./fv-tunnel
 
     # Installing UDP Mini
     mkdir -p /usr/local/kyt/
@@ -957,8 +1037,8 @@ rm -rf /root/LICENSE
 rm -rf /root/README.md
 rm -rf /root/domain
 secs_to_human "$(($(date +%s) - ${start}))"
-sudo hostnamectl set-hostname $username
+sudo hostnamectl set-hostname "$USERNAME"
 echo -e "${green} Installation finished! Now you can enjoy NorthAfrica Script.${NC}"
 echo ""
-read -p "$( echo -e "Press ${YELLOW}[ ${NC}${YELLOW}Enter${NC} ${YELLOW}]${NC} to reboot") "
+read -p "$( echo -e "Press ${YELLOW}[ ${NC}${YELLOW}Enter${NC} ${YELLOW}]${NC} to reboot") " _
 reboot
