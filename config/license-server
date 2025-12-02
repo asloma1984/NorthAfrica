@@ -1,1 +1,7 @@
 
+license-server/
+│
+├── server.js
+├── package.json
+├── README.md
+└── (db.sqlite will be created automatically)
