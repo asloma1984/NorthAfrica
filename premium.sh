@@ -1,6 +1,6 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9+/Ubuntu 18.04+/20+
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
 # Developer » Abdul (NorthAfrica Script)
 # Channel   » https://t.me/northafrica9
 # Group     » https://t.me/groupnorthafrica
@@ -25,17 +25,17 @@ red='\e[1;31m'
 green='\e[0;32m'
 
 clear
-# // Exporting IP Address Information
+# Export public IP
 export IP=$(curl -sS icanhazip.com)
 # Detect default network interface for vnstat
 NET=$(ip -o -4 route show to default | awk 'NR==1 {print $5}')
 
-# // Clear Data
+# Clear screen a few times
 clear
 clear && clear && clear
 clear; clear; clear
 
-# // Banner
+# Banner
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "  Developer » Abdul (NorthAfrica Script) ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
 echo -e "  » Auto install VPN & Xray server on your VPS"
@@ -48,7 +48,7 @@ sleep 2
 
 ###### CHECK SYSTEM
 
-# // Checking OS Architecture
+# Architecture
 if [[ $(uname -m | awk '{print $1}') == "x86_64" ]]; then
     echo -e "${OK} Your architecture is supported ( ${green}$(uname -m)${NC} )"
 else
@@ -56,9 +56,11 @@ else
     exit 1
 fi
 
-# // Checking System
+# OS detection
 OS_ID=$(grep -w ID /etc/os-release | head -n1 | sed 's/ID=//g' | sed 's/"//g')
 OS_NAME=$(grep -w PRETTY_NAME /etc/os-release | head -n1 | sed 's/PRETTY_NAME=//g' | sed 's/"//g')
+OS_VERSION_ID=$(grep -w VERSION_ID /etc/os-release | head -n1 | sed 's/VERSION_ID=//g' | sed 's/"//g')
+OS_MAJOR_VERSION=${OS_VERSION_ID%%.*}
 
 if [[ $OS_ID == "ubuntu" ]]; then
     echo -e "${OK} Your OS is supported ( ${green}${OS_NAME}${NC} )"
@@ -69,8 +71,8 @@ else
     exit 1
 fi
 
-# // IP Address Validating
-if [[ $IP == "" ]]; then
+# IP validation
+if [[ -z "$IP" ]]; then
     echo -e "${ERROR} IP Address ( ${YELLOW}Not Detected${NC} )"
 else
     echo -e "${OK} IP Address ( ${green}$IP${NC} )"
@@ -146,7 +148,6 @@ license_check() {
 license_check
 #-------------------------------------------------------------------------------
 
-# // Validate Successful
 echo ""
 read -p "$(echo -e "Press ${GRAY}[ ${NC}${green}Enter${NC} ${GRAY}]${NC} to start installation ") " _
 echo ""
@@ -168,34 +169,33 @@ NC='\e[0m'
 
 echo -e "\e[32mLoading...\e[0m"
 clear
-apt install ruby -y
+apt install -y ruby
 gem install lolcat
-apt install wondershaper -y
+apt install -y wondershaper
 clear
 
 # REPO (PRIVATE)
 REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/"
 
-####
 start=$(date +%s)
 secs_to_human() {
     echo "Installation time : $((${1} / 3600)) hours $(((${1} / 60) % 60)) minutes $((${1} % 60)) seconds"
 }
 
 ### Status helpers
-function print_ok() {
+print_ok() {
     echo -e "${OK} ${BLUE} $1 ${FONT}"
 }
-function print_install() {
+print_install() {
     echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
     echo -e "${YELLOW} » $1 ${FONT}"
     echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
     sleep 1
 }
-function print_error() {
+print_error() {
     echo -e "${ERROR} ${REDBG} $1 ${FONT}"
 }
-function print_success() {
+print_success() {
     if [[ 0 -eq $? ]]; then
         echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
         echo -e "${Green} » $1 successfully installed"
@@ -204,8 +204,8 @@ function print_success() {
     fi
 }
 
-### Check root (info only)
-function is_root() {
+### Root info helper (not enforced, just info)
+is_root() {
     if [[ 0 == "$UID" ]]; then
         print_ok "Root user - starting installation process"
     else
@@ -213,13 +213,13 @@ function is_root() {
     fi
 }
 
-# Create Xray directory
+# Create Xray directory and basic paths
 print_install "Create Xray directories"
 mkdir -p /etc/xray
 curl -s ifconfig.me > /etc/xray/ipvps
 touch /etc/xray/domain
 mkdir -p /var/log/xray
-chown www-data.www-data /var/log/xray
+chown www-data:www-data /var/log/xray
 chmod +x /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -243,39 +243,66 @@ export Kernel=$(uname -r)
 export Arch=$(uname -m)
 export IP=$(curl -s https://ipinfo.io/ip/)
 
-# Change Environment System
-function first_setup(){
+# --------------------------------------------------------------------
+# Change Environment System + HAProxy install (version-aware)
+# --------------------------------------------------------------------
+first_setup(){
+    print_install "System initial setup & HAProxy installation"
+
     timedatectl set-timezone Asia/Jakarta
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
     print_success "Xray directory initialized"
 
+    # Common update first
+    apt-get update -y
+
     if [[ $OS_ID == "ubuntu" ]]; then
         echo "Setup dependencies for ${OS_NAME}"
-        sudo apt update -y
-        apt-get install --no-install-recommends software-properties-common -y
-        add-apt-repository ppa:vbernat/haproxy-2.0 -y
-        apt-get -y install haproxy=2.0.\*
+        apt-get install -y --no-install-recommends software-properties-common
+
+        # Ubuntu: use distro HAProxy for >= 20, PPA only for 18.x
+        if [[ ${OS_MAJOR_VERSION} -ge 20 ]]; then
+            echo "Installing HAProxy from Ubuntu official repository..."
+            apt-get install -y haproxy
+        else
+            echo "Installing HAProxy 2.0 from PPA for older Ubuntu..."
+            add-apt-repository -y ppa:vbernat/haproxy-2.0
+            apt-get update -y
+            apt-get install -y haproxy=2.0.\*
+        fi
+
     elif [[ $OS_ID == "debian" ]]; then
         echo "Setup dependencies for ${OS_NAME}"
-        curl https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
-        echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-            http://haproxy.debian.net buster-backports-1.8 main \
-            >/etc/apt/sources.list.d/haproxy.list
-        sudo apt-get update
-        apt-get -y install haproxy=1.8.\*
+
+        # Debian 11/12 and newer → use official repo
+        if [[ ${OS_MAJOR_VERSION} -ge 11 ]]; then
+            echo "Installing HAProxy from Debian official repository..."
+            apt-get install -y haproxy
+        else
+            # Debian 9/10 → use haproxy.debian.net (1.8)
+            echo "Installing HAProxy 1.8 from haproxy.debian.net for older Debian..."
+            curl https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
+            echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
+                http://haproxy.debian.net buster-backports-1.8 main \
+                >/etc/apt/sources.list.d/haproxy.list
+            apt-get update -y
+            apt-get install -y haproxy=1.8.\*
+        fi
     else
         echo -e " Your OS is not supported (${OS_NAME})"
         exit 1
     fi
+
+    print_success "HAProxy installed and base environment prepared"
 }
 
 # GEO PROJECT / Nginx
 clear
-function nginx_install() {
+nginx_install() {
     if [[ $OS_ID == "ubuntu" ]]; then
         print_install "Install nginx for ${OS_NAME}"
-        sudo apt-get install nginx -y
+        apt-get install -y nginx
     elif [[ $OS_ID == "debian" ]]; then
         print_install "Install nginx for ${OS_NAME}"
         apt -y install nginx
@@ -285,38 +312,51 @@ function nginx_install() {
 }
 
 # Update and remove packages
-function base_package() {
+base_package() {
     clear
     print_install "Install required packages"
-    apt install zip pwgen openssl netcat socat cron bash-completion -y
-    apt install figlet -y
+    apt install -y zip pwgen openssl netcat socat cron bash-completion
+    apt install -y figlet
     apt update -y
     apt upgrade -y
-    apt dist-upgrade -y
-    systemctl enable chronyd
-    systemctl restart chronyd
-    systemctl enable chrony
-    systemctl restart chrony
-    chronyc sourcestats -v
-    chronyc tracking -v
-    apt install ntpdate -y
-    ntpdate pool.ntp.org
-    apt install sudo -y
+    apt dist-upgrade -y || true
+
+    systemctl enable chronyd 2>/dev/null || true
+    systemctl restart chronyd 2>/dev/null || true
+    systemctl enable chrony 2>/dev/null || true
+    systemctl restart chrony 2>/dev/null || true
+    chronyc sourcestats -v 2>/dev/null || true
+    chronyc tracking -v 2>/dev/null || true
+
+    apt install -y ntpdate
+    ntpdate pool.ntp.org || true
+    apt install -y sudo
     sudo apt-get clean all
     sudo apt-get autoremove -y
     sudo apt-get install -y debconf-utils
-    sudo apt-get remove --purge exim4 -y
-    sudo apt-get remove --purge ufw firewalld -y
+    sudo apt-get remove --purge -y exim4 || true
+    sudo apt-get remove --purge -y ufw firewalld || true
     sudo apt-get install -y --no-install-recommends software-properties-common
+
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-    sudo apt-get install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev libssl-dev libsqlite3-dev sed dirmngr libxml-parser-perl build-essential gcc g++ python htop lsof tar wget curl ruby zip unzip p7zip-full python3-pip libc6 util-linux build-essential msmtp-mta ca-certificates bsd-mailx iptables iptables-persistent netfilter-persistent net-tools openssl ca-certificates gnupg gnupg2 ca-certificates lsb-release gcc shc make cmake git screen socat xz-utils apt-transport-https gnupg1 dnsutils cron bash-completion ntpdate chrony jq openvpn easy-rsa
+
+    sudo apt-get install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config \
+        libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev \
+        flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev \
+        libssl-dev libsqlite3-dev sed dirmngr libxml-parser-perl build-essential \
+        gcc g++ python htop lsof tar wget curl ruby zip unzip p7zip-full python3-pip \
+        libc6 util-linux build-essential msmtp-mta ca-certificates bsd-mailx \
+        iptables iptables-persistent netfilter-persistent net-tools openssl \
+        ca-certificates gnupg gnupg2 lsb-release shc cmake git screen socat \
+        xz-utils apt-transport-https gnupg1 dnsutils cron ntpdate chrony jq openvpn easy-rsa
+
     print_success "Required packages installed"
 }
 
-clear
 # Domain input
-function pasang_domain() {
+clear
+pasang_domain() {
     echo -e ""
     clear
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -339,8 +379,7 @@ function pasang_domain() {
         echo "$host1" > /root/domain
         echo ""
     elif [[ $host == "2" ]]; then
-        # install Cloudflare helper script from your repo
-        wget ${REPO}files/cf.sh && chmod +x cf.sh && ./cf.sh
+        wget "${REPO}files/cf.sh" -O cf.sh && chmod +x cf.sh && ./cf.sh
         rm -f /root/cf.sh
         clear
     else
@@ -349,8 +388,7 @@ function pasang_domain() {
     fi
 }
 
-# Wrapper to keep original call name
-function pair_domain() {
+pair_domain() {
     pasang_domain
 }
 
@@ -363,7 +401,6 @@ restart_system(){
     clear
     izinsc="$LICENSE_URL"
 
-    # USERNAME & EXP (already saved earlier, but we refresh from register)
     rm -f /usr/bin/user
     rm -f /usr/bin/e
     line=$(curl -fsSL "$izinsc" | awk -v ip="$MYIP" '$NF==ip {print}')
@@ -423,7 +460,7 @@ Automatic notification from private repo."
 
 clear
 # Install SSL
-function pasang_ssl() {
+pasang_ssl() {
     clear
     print_install "Install SSL certificate for domain"
     rm -rf /etc/xray/xray.key
@@ -432,19 +469,19 @@ function pasang_ssl() {
     STOPWEBSERVER=$(lsof -i:80 | awk 'NR==2 {print $1}')
     rm -rf /root/.acme.sh
     mkdir /root/.acme.sh
-    systemctl stop $STOPWEBSERVER 2>/dev/null
-    systemctl stop nginx
+    systemctl stop "$STOPWEBSERVER" 2>/dev/null || true
+    systemctl stop nginx 2>/dev/null || true
     curl https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
     chmod +x /root/.acme.sh/acme.sh
     /root/.acme.sh/acme.sh --upgrade --auto-upgrade
     /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    /root/.acme.sh/acme.sh --issue -d $domain --standalone -k ec-256
-    ~/.acme.sh/acme.sh --installcert -d $domain --fullchainpath /etc/xray/xray.crt --keypath /etc/xray/xray.key --ecc
+    /root/.acme.sh/acme.sh --issue -d "$domain" --standalone -k ec-256
+    ~/.acme.sh/acme.sh --installcert -d "$domain" --fullchainpath /etc/xray/xray.crt --keypath /etc/xray/xray.key --ecc
     chmod 777 /etc/xray/xray.key
     print_success "SSL Certificate installed"
 }
 
-function make_folder_xray() {
+make_folder_xray() {
     rm -rf /etc/vmess/.vmess.db
     rm -rf /etc/vless/.vless.db
     rm -rf /etc/trojan/.trojan.db
@@ -490,15 +527,15 @@ function make_folder_xray() {
 }
 
 # Install Xray core
-function install_xray() {
+install_xray() {
     clear
     print_install "Install Xray Core (latest)"
-    domainSock_dir="/run/xray"; ! [ -d $domainSock_dir ] && mkdir $domainSock_dir
-    chown www-data.www-data $domainSock_dir
+    domainSock_dir="/run/xray"; ! [ -d "$domainSock_dir" ] && mkdir "$domainSock_dir"
+    chown www-data:www-data "$domainSock_dir"
     
     # Get latest Xray core
-    latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*\"v(.*)\".*/\1/' | head -n 1)"
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version $latest_version
+    latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\1/' | head -n 1)"
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version "$latest_version"
  
     # Get server config
     wget -O /etc/xray/config.json "${REPO}config/config.json" >/dev/null 2>&1
@@ -516,7 +553,7 @@ function install_xray() {
     wget -O /etc/nginx/conf.d/xray.conf "${REPO}config/xray.conf" >/dev/null 2>&1
     sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
-    curl ${REPO}config/nginx.conf > /etc/nginx/nginx.conf
+    curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
     
     cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem >/dev/null
 
@@ -548,7 +585,7 @@ EOF
     print_success "Xray configuration"
 }
 
-function ssh(){
+ssh(){
     clear
     print_install "Configure SSH password policy"
     wget -O /etc/pam.d/common-password "${REPO}files/password"
@@ -616,40 +653,37 @@ END
     print_success "SSH password configuration"
 }
 
-# Placeholder to keep original call in instal()
-function password_default(){
-    : # no-op
+password_default(){
+    : # no-op (kept for compatibility)
 }
 
-function udp_mini(){
+udp_mini(){
     clear
     print_install "Install Service Limit IP & Quota"
-    # All from your private repo
     wget -q "${REPO}config/fv-tunnel" -O fv-tunnel && chmod +x fv-tunnel && ./fv-tunnel
 
-    # Installing UDP Mini
     mkdir -p /usr/local/kyt/
     wget -q -O /usr/local/kyt/udp-mini "${REPO}files/udp-mini"
     chmod +x /usr/local/kyt/udp-mini
     wget -q -O /etc/systemd/system/udp-mini-1.service "${REPO}files/udp-mini-1.service"
     wget -q -O /etc/systemd/system/udp-mini-2.service "${REPO}files/udp-mini-2.service"
     wget -q -O /etc/systemd/system/udp-mini-3.service "${REPO}files/udp-mini-3.service"
-    systemctl disable udp-mini-1
-    systemctl stop udp-mini-1
+    systemctl disable udp-mini-1 2>/dev/null
+    systemctl stop udp-mini-1 2>/dev/null
     systemctl enable udp-mini-1
     systemctl start udp-mini-1
-    systemctl disable udp-mini-2
-    systemctl stop udp-mini-2
+    systemctl disable udp-mini-2 2>/dev/null
+    systemctl stop udp-mini-2 2>/dev/null
     systemctl enable udp-mini-2
     systemctl start udp-mini-2
-    systemctl disable udp-mini-3
-    systemctl stop udp-mini-3
+    systemctl disable udp-mini-3 2>/dev/null
+    systemctl stop udp-mini-3 2>/dev/null
     systemctl enable udp-mini-3
     systemctl start udp-mini-3
     print_success "Limit IP Service"
 }
 
-function ssh_slow(){
+ssh_slow(){
     clear
     print_install "Install SlowDNS server module"
     wget -q -O /tmp/nameserver "${REPO}files/nameserver" >/dev/null 2>&1
@@ -658,29 +692,29 @@ function ssh_slow(){
     print_success "SlowDNS"
 }
 
-function ins_SSHD(){
+ins_SSHD(){
     clear
     print_install "Install SSHD"
     wget -q -O /etc/ssh/sshd_config "${REPO}files/sshd" >/dev/null 2>&1
     chmod 700 /etc/ssh/sshd_config
     /etc/init.d/ssh restart
     systemctl restart ssh
-    /etc/init.d/ssh status
+    /etc/init.d/ssh status || true
     print_success "SSHD"
 }
 
-function ins_dropbear(){
+ins_dropbear(){
     clear
     print_install "Install Dropbear"
-    apt-get install dropbear -y > /dev/null 2>&1
+    apt-get install -y dropbear > /dev/null 2>&1
     wget -q -O /etc/default/dropbear "${REPO}config/dropbear.conf"
     chmod +x /etc/default/dropbear
     /etc/init.d/dropbear restart
-    /etc/init.d/dropbear status
+    /etc/init.d/dropbear status || true
     print_success "Dropbear"
 }
 
-function ins_vnstat(){
+ins_vnstat(){
     clear
     print_install "Install Vnstat"
     apt -y install vnstat > /dev/null 2>&1
@@ -691,42 +725,41 @@ function ins_vnstat(){
     cd vnstat-2.6
     ./configure --prefix=/usr --sysconfdir=/etc && make && make install
     cd
-    vnstat -u -i $NET
+    vnstat -u -i "$NET"
     sed -i "s/Interface \"eth0\"/Interface \"$NET\"/g" /etc/vnstat.conf
     chown vnstat:vnstat /var/lib/vnstat -R
     systemctl enable vnstat
     /etc/init.d/vnstat restart
-    /etc/init.d/vnstat status
+    /etc/init.d/vnstat status || true
     rm -f /root/vnstat-2.6.tar.gz
     rm -rf /root/vnstat-2.6
     print_success "Vnstat"
 }
 
-function ins_openvpn(){
+ins_openvpn(){
     clear
     print_install "Install OpenVPN"
-    wget ${REPO}files/openvpn &&  chmod +x openvpn && ./openvpn
+    wget "${REPO}files/openvpn" -O openvpn && chmod +x openvpn && ./openvpn
     /etc/init.d/openvpn restart
     print_success "OpenVPN"
 }
 
-function ins_backup(){
+ins_backup(){
     clear
     print_install "Install backup system"
-    apt install rclone -y
+    apt install -y rclone
     printf "q\n" | rclone config
     mkdir -p /root/.config/rclone
     wget -O /root/.config/rclone/rclone.conf "${REPO}config/rclone.conf"
 
-    # Install Wondershaper
     cd /bin
-    git clone  https://github.com/magnific0/wondershaper.git
+    git clone https://github.com/magnific0/wondershaper.git
     cd wondershaper
-    sudo make install
+    make install
     cd
     rm -rf wondershaper
     echo > /home/limit
-    apt install msmtp-mta ca-certificates bsd-mailx -y
+    apt install -y msmtp-mta ca-certificates bsd-mailx
 
 cat <<EOF >/etc/msmtprc
 defaults
@@ -749,13 +782,13 @@ EOF
     print_success "Backup server configuration"
 }
 
-function ins_swab(){
+ins_swab(){
     clear
     print_install "Install Swap 1 GB & BBR"
     gotop_latest="$(curl -s https://api.github.com/repos/xxxserxxx/gotop/releases | grep tag_name | sed -E 's/.*\"v(.*)\".*/\1/' | head -n 1)"
-    gotop_link="https://github.com/xxxserxxx/gotop/releases/download/v$gotop_latest/gotop_v${gotop_latest}_linux_amd64.deb"
+    gotop_link="https://github.com/xxxserxxx/gotop/releases/download/v${gotop_latest}/gotop_v${gotop_latest}_linux_amd64.deb"
     curl -sL "$gotop_link" -o /tmp/gotop.deb
-    dpkg -i /tmp/gotop.deb >/dev/null 2>&1
+    dpkg -i /tmp/gotop.deb >/dev/null 2>&1 || true
     
     dd if=/dev/zero of=/swapfile bs=1024 count=1048576
     mkswap /swapfile
@@ -764,40 +797,35 @@ function ins_swab(){
     swapon /swapfile >/dev/null 2>&1
     sed -i '$ i\/swapfile      swap swap   defaults    0 0' /etc/fstab
 
-    chronyd -q 'server 0.id.pool.ntp.org iburst'
-    chronyc sourcestats -v
-    chronyc tracking -v
+    chronyd -q 'server 0.id.pool.ntp.org iburst' 2>/dev/null || true
+    chronyc sourcestats -v 2>/dev/null || true
+    chronyc tracking -v 2>/dev/null || true
     
-    wget ${REPO}files/bbr.sh &&  chmod +x bbr.sh && ./bbr.sh
+    wget "${REPO}files/bbr.sh" -O bbr.sh && chmod +x bbr.sh && ./bbr.sh
     print_success "Swap 1 GB & BBR"
 }
 
-function ins_Fail2ban(){
+ins_Fail2ban(){
     clear
     print_install "Install Fail2ban & banner"
-    # Original Fail2ban install is commented (keep same behavior)
+    # (Optional) real fail2ban install is still commented
     #apt -y install fail2ban > /dev/null 2>&1
-    #sudo systemctl enable --now fail2ban
+    #systemctl enable --now fail2ban
     #/etc/init.d/fail2ban restart
-    #/etc/init.d/fail2ban status
 
-    # Fix: always recreate DDOS directory instead of exiting
     if [ -d '/usr/local/ddos' ]; then
         rm -rf /usr/local/ddos
     fi
     mkdir -p /usr/local/ddos
 
-    clear
-    # SSH / Dropbear banners
     echo "Banner /etc/kyt.txt" >>/etc/ssh/sshd_config
     sed -i 's@DROPBEAR_BANNER=""@DROPBEAR_BANNER="/etc/kyt.txt"@g' /etc/default/dropbear
 
-    # Replace banner
     wget -O /etc/kyt.txt "${REPO}files/issue.net"
     print_success "Fail2ban & banner"
 }
 
-function ins_epro(){
+ins_epro(){
     clear
     print_install "Install ePro WebSocket Proxy"
     wget -O /usr/bin/ws "${REPO}files/ws" >/dev/null 2>&1
@@ -840,7 +868,7 @@ function ins_epro(){
     print_success "ePro WebSocket Proxy"
 }
 
-function ins_restart(){
+ins_restart(){
     clear
     print_install "Restarting all services"
     /etc/init.d/nginx restart
@@ -876,10 +904,10 @@ function ins_restart(){
 }
 
 # Install Menu
-function menu(){
+menu(){
     clear
     print_install "Install Menu scripts"
-    wget ${REPO}menu/menu.zip
+    wget "${REPO}menu/menu.zip" -O menu.zip
     unzip menu.zip
     chmod +x menu/*
     mv menu/* /usr/local/sbin
@@ -888,7 +916,7 @@ function menu(){
 }
 
 # Default profile / cron
-function profile(){
+profile(){
     clear
     cat >/root/.profile <<EOF
 # ~/.profile: executed by Bourne-compatible login shells.
@@ -982,7 +1010,7 @@ EOF
 }
 
 # Enable services after install
-function enable_services(){
+enable_services(){
     clear
     print_install "Enable services"
     systemctl daemon-reload
@@ -999,7 +1027,7 @@ function enable_services(){
 }
 
 # Main install function
-function instal(){
+instal(){
     clear
     first_setup
     nginx_install
