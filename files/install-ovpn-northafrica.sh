@@ -1,13 +1,12 @@
 
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9+/Ubuntu 18.04+/20+
-# Developer  : NORTH AFRICA TEAM
-# Email      : Aslomaking1984@gmail.com
-# Telegram   : https://t.me/northafrica9
-# Telegram Group : https://t.me/groupnorthafrica
-# Script Name : install-ovpn-northafrica.sh
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script
 
 export DEBIAN_FRONTEND=noninteractive
 OS=`uname -m`;
