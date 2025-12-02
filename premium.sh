@@ -24,7 +24,46 @@ NC='\e[0m'
 red='\e[1;31m'
 green='\e[0;32m'
 
+# ==========================
+#  ANTI-TAMPER PROTECTION
+# ==========================
+# NOTE:
+# 1) This HASH must always match the *current* file content.
+# 2) After ANY edit to this script run:  sha256sum premium.sh
+#    Then copy the new hash and paste it here.
+ORIGINAL_HASH="9dd21034a9b58b4ab148665b6675810632c21bf6f83c9cbfd95616b7a6c1ef90"
+
+self_integrity_check() {
+    # Skip check if sha256sum is not available (very old systems)
+    if ! command -v sha256sum >/dev/null 2>&1; then
+        echo -e "${ERROR} sha256sum command not found, skipping integrity check.${NC}"
+        return 0
+    fi
+
+    local current_hash
+    current_hash=$(sha256sum "$0" | awk '{print $1}')
+
+    if [[ "$current_hash" != "$ORIGINAL_HASH" ]]; then
+        echo -e ""
+        echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+        echo -e "\033[41;97m          SECURITY ALERT (ANTI-TAMPER)          \033[0m"
+        echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+        echo -e ""
+        echo -e "  ${RED}Script integrity check FAILED!${NC}"
+        echo -e "  This copy of ${YELLOW}premium.sh${NC} has been modified"
+        echo -e "  and does not match the original signed version."
+        echo -e ""
+        echo -e "  Please download a fresh copy from the official repo."
+        echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+        exit 1
+    fi
+}
+
 clear
+
+# Run anti-tamper check as early as possible
+self_integrity_check
+
 # Export public IP
 export IP=$(curl -sS icanhazip.com)
 # Detect default network interface for vnstat
@@ -699,18 +738,18 @@ udp_mini(){
     wget -q -O /etc/systemd/system/udp-mini-1.service "${REPO}files/udp-mini-1.service"
     wget -q -O /etc/systemd/system/udp-mini-2.service "${REPO}files/udp-mini-2.service"
     wget -q -O /etc/systemd/system/udp-mini-3.service "${REPO}files/udp-mini-3.service"
-    systemctl.disable udp-mini-1 2>/dev/null
-    systemctl.stop udp-mini-1 2>/dev/null
-    systemctl.enable udp-mini-1
-    systemctl.start udp-mini-1
-    systemctl.disable udp-mini-2 2>/dev/null
-    systemctl.stop udp-mini-2 2>/dev/null
-    systemctl.enable udp-mini-2
-    systemctl.start udp-mini-2
-    systemctl.disable udp-mini-3 2>/dev/null
-    systemctl.stop udp-mini-3 2>/dev/null
-    systemctl.enable udp-mini-3
-    systemctl.start udp-mini-3
+    systemctl disable udp-mini-1 2>/dev/null
+    systemctl stop udp-mini-1 2>/dev/null
+    systemctl enable udp-mini-1
+    systemctl start udp-mini-1
+    systemctl disable udp-mini-2 2>/dev/null
+    systemctl stop udp-mini-2 2>/dev/null
+    systemctl enable udp-mini-2
+    systemctl start udp-mini-2
+    systemctl disable udp-mini-3 2>/dev/null
+    systemctl stop udp-mini-3 2>/dev/null
+    systemctl enable udp-mini-3
+    systemctl start udp-mini-3
     print_success "Limit IP Service"
 }
 
@@ -890,8 +929,8 @@ ins_epro(){
     iptables -A FORWARD -m string --algo bm --string "info_hash" -j DROP
     iptables-save > /etc/iptables.up.rules
     iptables-restore -t < /etc/iptables.up.rules
-    netfilter-persistent.save
-    netfilter-persistent.reload
+    netfilter-persistent save
+    netfilter-persistent reload
 
     cd
     apt autoclean -y >/dev/null 2>&1
@@ -918,11 +957,11 @@ ins_restart(){
     systemctl enable --now rc-local
     systemctl enable --now dropbear
     systemctl enable --now openvpn
-    systemctl.enable --now cron
-    systemctl.enable --now haproxy
-    systemctl.enable --now netfilter-persistent
-    systemctl.enable --now ws
-    systemctl.enable --now fail2ban 2>/dev/null || true
+    systemctl enable --now cron
+    systemctl enable --now haproxy
+    systemctl enable --now netfilter-persistent
+    systemctl enable --now ws
+    systemctl enable --now fail2ban 2>/dev/null || true
 
     history -c
     echo "unset HISTFILE" >> /etc/profile
@@ -994,7 +1033,7 @@ END
 
     echo "*/1 * * * * root echo -n > /var/log/nginx/access.log" >/etc/cron.d/log.nginx
     echo "*/1 * * * * root echo -n > /var/log/xray/access.log" >>/etc/cron.d/log.xray
-    service cron restart
+    service cron.restart
 
     cat >/home/daily_reboot <<-END
 5
@@ -1046,13 +1085,13 @@ enable_services(){
     print_install "Enable services"
     systemctl daemon-reload
     systemctl start netfilter-persistent
-    systemctl.enable --now rc-local
-    systemctl.enable --now cron
-    systemctl.enable --now netfilter-persistent
-    systemctl.restart nginx
-    systemctl.restart xray
-    systemctl.restart cron
-    systemctl.restart haproxy
+    systemctl enable --now rc-local
+    systemctl enable --now cron
+    systemctl enable --now netfilter-persistent
+    systemctl restart nginx
+    systemctl restart xray
+    systemctl restart cron
+    systemctl restart haproxy
     print_success "Services enabled"
     clear
 }
