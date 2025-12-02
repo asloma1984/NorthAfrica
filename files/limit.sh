@@ -1,11 +1,11 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9+/Ubuntu 18.04+/20+
-# Developer  : NORTH AFRICA TEAM
-# Email      : Aslomaking1984@gmail.com
-# Telegram   : https://t.me/northafrica9
-# Telegram Group : https://t.me/groupnorthafrica
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script
 
 REPO="https://raw.githubusercontent.com/johntezali56/PREMIER-/main/"
 wget -q -O /etc/systemd/system/limitvmess.service "${REPO}files/limitvmess.service" && chmod +x limitvmess.service >/dev/null 2>&1
