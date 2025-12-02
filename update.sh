@@ -1,11 +1,13 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9+/Ubuntu 18.04+/20+/24+
-# Developer   » Abdul (NorthAfrica Script Private Edition)
-# Channel     » t.me/Abdulsalam403
-# Group       » https://t.me/groupnorthafrica
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script
 # Year        » 2025
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 clear
 
