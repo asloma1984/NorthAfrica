@@ -169,6 +169,11 @@ NC='\e[0m'
 
 echo -e "\e[32mLoading...\e[0m"
 clear
+
+# Basic dependencies first to avoid errors (curl / socat / netcat / lsof / unzip)
+apt update -y
+apt install -y curl socat netcat lsof unzip
+
 apt install -y ruby
 gem install lolcat
 apt install -y wondershaper
@@ -380,7 +385,8 @@ pasang_domain() {
         echo ""
     elif [[ $host == "2" ]]; then
         wget "${REPO}files/cf.sh" -O cf.sh && chmod +x cf.sh && ./cf.sh
-        rm -f /root/cf.sh
+        # Clean both possible locations, keep old behavior but fix name
+        rm -f cf.sh /root/cf.sh
         clear
     else
         print_install "Random subdomain/domain is used"
@@ -465,11 +471,17 @@ pasang_ssl() {
     print_install "Install SSL certificate for domain"
     rm -rf /etc/xray/xray.key
     rm -rf /etc/xray/xray.crt
-    domain=$(cat /root/domain)
+    domain=$(cat /root/domain 2>/dev/null || cat /etc/xray/domain 2>/dev/null)
+    if [[ -z "$domain" ]]; then
+        print_error "Domain file /root/domain or /etc/xray/domain not found. Cannot issue certificate."
+        return
+    fi
     STOPWEBSERVER=$(lsof -i:80 | awk 'NR==2 {print $1}')
     rm -rf /root/.acme.sh
     mkdir /root/.acme.sh
-    systemctl stop "$STOPWEBSERVER" 2>/dev/null || true
+    if [[ -n "$STOPWEBSERVER" ]]; then
+        systemctl stop "$STOPWEBSERVER" 2>/dev/null || true
+    fi
     systemctl stop nginx 2>/dev/null || true
     curl https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
     chmod +x /root/.acme.sh/acme.sh
@@ -534,7 +546,7 @@ install_xray() {
     chown www-data:www-data "$domainSock_dir"
     
     # Get latest Xray core
-    latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\1/' | head -n 1)"
+    latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*\"v(.*)\".*/\1/' | head -n 1)"
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version "$latest_version"
  
     # Get server config
@@ -554,6 +566,25 @@ install_xray() {
     sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
+
+    # Fix common HAProxy config issues (duplicate pidfile, bind-process, missing newline)
+    if [[ -f /etc/haproxy/haproxy.cfg ]]; then
+        # Comment all bind-process lines (to avoid invalid CPU range and deprecation warnings)
+        sed -i 's/^[[:space:]]*bind-process/# bind-process disabled by installer /g' /etc/haproxy/haproxy.cfg
+        # Keep first pidfile, comment any additional ones
+        awk '
+            /^ *pidfile/ {
+                if (seen_pidfile) {
+                    sub(/^/, "# duplicate pidfile disabled by installer: ");
+                } else {
+                    seen_pidfile=1
+                }
+            }
+            {print}
+        ' /etc/haproxy/haproxy.cfg > /etc/haproxy/haproxy.cfg.tmp && mv /etc/haproxy/haproxy.cfg.tmp /etc/haproxy/haproxy.cfg
+        # Ensure file ends with newline
+        echo "" >> /etc/haproxy/haproxy.cfg
+    fi
     
     cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem >/dev/null
 
@@ -668,18 +699,18 @@ udp_mini(){
     wget -q -O /etc/systemd/system/udp-mini-1.service "${REPO}files/udp-mini-1.service"
     wget -q -O /etc/systemd/system/udp-mini-2.service "${REPO}files/udp-mini-2.service"
     wget -q -O /etc/systemd/system/udp-mini-3.service "${REPO}files/udp-mini-3.service"
-    systemctl disable udp-mini-1 2>/dev/null
-    systemctl stop udp-mini-1 2>/dev/null
-    systemctl enable udp-mini-1
-    systemctl start udp-mini-1
-    systemctl disable udp-mini-2 2>/dev/null
-    systemctl stop udp-mini-2 2>/dev/null
-    systemctl enable udp-mini-2
-    systemctl start udp-mini-2
-    systemctl disable udp-mini-3 2>/dev/null
-    systemctl stop udp-mini-3 2>/dev/null
-    systemctl enable udp-mini-3
-    systemctl start udp-mini-3
+    systemctl.disable udp-mini-1 2>/dev/null
+    systemctl.stop udp-mini-1 2>/dev/null
+    systemctl.enable udp-mini-1
+    systemctl.start udp-mini-1
+    systemctl.disable udp-mini-2 2>/dev/null
+    systemctl.stop udp-mini-2 2>/dev/null
+    systemctl.enable udp-mini-2
+    systemctl.start udp-mini-2
+    systemctl.disable udp-mini-3 2>/dev/null
+    systemctl.stop udp-mini-3 2>/dev/null
+    systemctl.enable udp-mini-3
+    systemctl.start udp-mini-3
     print_success "Limit IP Service"
 }
 
@@ -859,8 +890,8 @@ ins_epro(){
     iptables -A FORWARD -m string --algo bm --string "info_hash" -j DROP
     iptables-save > /etc/iptables.up.rules
     iptables-restore -t < /etc/iptables.up.rules
-    netfilter-persistent save
-    netfilter-persistent reload
+    netfilter-persistent.save
+    netfilter-persistent.reload
 
     cd
     apt autoclean -y >/dev/null 2>&1
@@ -887,11 +918,11 @@ ins_restart(){
     systemctl enable --now rc-local
     systemctl enable --now dropbear
     systemctl enable --now openvpn
-    systemctl enable --now cron
-    systemctl enable --now haproxy
-    systemctl enable --now netfilter-persistent
-    systemctl enable --now ws
-    systemctl enable --now fail2ban 2>/dev/null || true
+    systemctl.enable --now cron
+    systemctl.enable --now haproxy
+    systemctl.enable --now netfilter-persistent
+    systemctl.enable --now ws
+    systemctl.enable --now fail2ban 2>/dev/null || true
 
     history -c
     echo "unset HISTFILE" >> /etc/profile
@@ -1015,13 +1046,13 @@ enable_services(){
     print_install "Enable services"
     systemctl daemon-reload
     systemctl start netfilter-persistent
-    systemctl enable --now rc-local
-    systemctl enable --now cron
-    systemctl enable --now netfilter-persistent
-    systemctl restart nginx
-    systemctl restart xray
-    systemctl restart cron
-    systemctl restart haproxy
+    systemctl.enable --now rc-local
+    systemctl.enable --now cron
+    systemctl.enable --now netfilter-persistent
+    systemctl.restart nginx
+    systemctl.restart xray
+    systemctl.restart cron
+    systemctl.restart haproxy
     print_success "Services enabled"
     clear
 }
