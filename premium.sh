@@ -24,6 +24,8 @@ NC='\e[0m'
 red='\e[1;31m'
 green='\e[0;32m'
 
+DEV_MODE="on"
+
 # ==========================
 #  ANTI-TAMPER PROTECTION
 # ==========================
@@ -34,6 +36,14 @@ green='\e[0;32m'
 ORIGINAL_HASH="9dd21034a9b58b4ab148665b6675810632c21bf6f83c9cbfd95616b7a6c1ef90"
 
 self_integrity_check() {
+
+    # ========== DEV MODE BYPASS ==========
+    if [[ "$DEV_MODE" == "on" ]]; then
+        echo -e "${YELLOW}[DEV MODE] Anti-Tamper disabled. Skipping integrity check...${NC}"
+        return 0
+    fi
+    # =====================================
+
     # Skip check if sha256sum is not available (very old systems)
     if ! command -v sha256sum >/dev/null 2>&1; then
         echo -e "${ERROR} sha256sum command not found, skipping integrity check.${NC}"
