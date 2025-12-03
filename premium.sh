@@ -359,43 +359,61 @@ base_package() {
     print_success "Required packages installed"
 }
 
-# Domain input
-clear
+# Domain + NS Domain Input
 pasang_domain() {
-    echo -e ""
     clear
+    echo -e ""
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e " \e[1;32mPlease select a domain type below \e[0m"
+    echo -e " \e[1;32mSelect Domain Type\e[0m"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo -e " \e[1;32m1)\e[0m Use your domain (recommended)"
     echo -e " \e[1;32m2)\e[0m Use random subdomain via Cloudflare script"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    read -p " Please select 1-2 (or any key for random) : " host
+    read -p " Select 1-2 (or any key for random) : " host
     echo ""
+
     if [[ $host == "1" ]]; then
-        echo -e " \e[1;32mPlease enter your subdomain $NC"
-        echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-        echo -e ""
-        read -p " Input Domain : " host1
-        echo -e ""
-        echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-        echo "IP=" >> /var/lib/kyt/ipvps.conf
-        echo "$host1" > /etc/xray/domain
-        echo "$host1" > /root/domain
-        echo ""
+        echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo -e " \e[1;32mEnter your MAIN domain (example: vpn.yourdomain.com)\e[0m"
+        echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        read -p " Input Domain : " DOMAIN
+
+        if [[ -z "$DOMAIN" ]]; then
+            echo -e "\e[31m[ERROR] Domain cannot be empty!\e[0m"
+            exit 1
+        fi
+
+        echo "$DOMAIN" > /etc/xray/domain
+        echo "$DOMAIN" > /root/domain
+        echo "IP=$DOMAIN" > /var/lib/kyt/ipvps.conf
+
     elif [[ $host == "2" ]]; then
         wget "${REPO}files/cf.sh" -O cf.sh && chmod +x cf.sh && ./cf.sh
-        # Clean both possible locations, keep old behavior but fix name
         rm -f cf.sh /root/cf.sh
-        clear
     else
-        print_install "Random subdomain/domain is used"
-        clear
+        print_install "Random domain used"
     fi
-}
 
-pair_domain() {
-    pasang_domain
+    DOMAIN=$(cat /etc/xray/domain)
+
+    echo ""
+    echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo -e " \e[1;32mEnter NS Domain for SlowDNS\e[0m"
+    echo -e " Example: dns.$DOMAIN"
+    echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -p " Input NS Domain : " NS_DOMAIN
+
+    if [[ -z "$NS_DOMAIN" ]]; then
+        echo -e "\e[31m[ERROR] NS Domain cannot be empty!\e[0m"
+        exit 1
+    fi
+
+    mkdir -p /etc/slowdns
+    echo "$NS_DOMAIN" > /etc/slowdns/ns
+    echo "$NS_DOMAIN" > /etc/xray/slowdns_ns
+
+    export DOMAIN
+    export NS_DOMAIN
 }
 
 clear
@@ -740,13 +758,73 @@ udp_mini(){
     print_success "Limit IP Service"
 }
 
-ssh_slow(){
+install_slowdns() {
     clear
-    print_install "Install SlowDNS server module"
-    wget -q -O /tmp/nameserver "${REPO}files/nameserver" >/dev/null 2>&1
-    chmod +x /tmp/nameserver
-    bash /tmp/nameserver | tee /root/install.log
-    print_success "SlowDNS"
+    print_install "Installing SlowDNS (DNSTT) Server"
+
+    CONFIG_DIR="/etc/slowdns"
+    INSTALL_DIR="/usr/local/bin"
+    DNSTT_PORT="5300"
+    DNSTT_URL="https://dnstt.network"
+
+    mkdir -p "$CONFIG_DIR"
+
+    # Read NS domain
+    NS_DOMAIN=$(cat /etc/slowdns/ns 2>/dev/null)
+    if [[ -z "$NS_DOMAIN" ]]; then
+        echo -e "\e[31m[ERROR] NS Domain not found! Did you forget to set it in pasang_domain()?\e[0m"
+        sleep 2
+        return 1
+    fi
+
+    # Detect architecture
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  BIN="dnstt-server-linux-amd64" ;;
+        aarch64) BIN="dnstt-server-linux-arm64" ;;
+        armv7l|armv6l) BIN="dnstt-server-linux-arm" ;;
+        i386|i686) BIN="dnstt-server-linux-386" ;;
+        *) echo -e "\e[31mUnsupported architecture: $ARCH\e[0m"; exit 1 ;;
+    esac
+
+    # Download server
+    wget -q -O "$INSTALL_DIR/dnstt-server" "$DNSTT_URL/$BIN"
+    chmod +x "$INSTALL_DIR/dnstt-server"
+
+    # Generate DNSTT keys
+    "$INSTALL_DIR/dnstt-server" -gen-key \
+        -privkey-file "$CONFIG_DIR/server.key" \
+        -pubkey-file "$CONFIG_DIR/server.pub"
+
+    PUBKEY=$(cat "$CONFIG_DIR/server.pub")
+    echo "$PUBKEY" > "$CONFIG_DIR/public.key"
+    echo "$PUBKEY" > /etc/xray/slowdns_pub
+
+    # Firewall + NAT
+    iptables -I INPUT -p udp --dport "$DNSTT_PORT" -j ACCEPT
+    iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-port "$DNSTT_PORT"
+    netfilter-persistent save >/dev/null 2>&1
+    netfilter-persistent reload >/dev/null 2>&1
+
+    # systemd service
+cat > /etc/systemd/system/slowdns.service << EOF
+[Unit]
+Description=SlowDNS (DNSTT) Server
+After=network.target
+
+[Service]
+ExecStart=$INSTALL_DIR/dnstt-server -udp :$DNSTT_PORT -privkey-file $CONFIG_DIR/server.key $NS_DOMAIN 127.0.0.1:22
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable slowdns
+    systemctl restart slowdns
+
+    print_success "SlowDNS Installed Successfully"
 }
 
 ins_SSHD(){
@@ -1090,13 +1168,13 @@ instal(){
     nginx_install
     base_package
     make_folder_xray
-    pair_domain
+    pasang_domain
     password_default
     pasang_ssl
     install_xray
     ssh
     udp_mini
-    ssh_slow
+    install_slowdns
     ins_SSHD
     ins_dropbear
     ins_vnstat
