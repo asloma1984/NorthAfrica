@@ -28,8 +28,8 @@ via
 wget -q https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/update.sh && chmod +x update.sh && ./update.sh
 
 ## TESTED ON OS
-- UBUNTU Version 18 Or 25 (Recommended)
-- DEBIAN Version 09 Or 10
+- UBUNTU Version 18 to 25 (Recommended)
+- DEBIAN Version 09 to 13
 
 ## FEATURES 
 - User Details 
