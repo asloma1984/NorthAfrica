@@ -24,29 +24,24 @@ NC='\e[0m'
 red='\e[1;31m'
 green='\e[0;32m'
 
-DEV_MODE="on"
+DEV_MODE="on"   # change to "off" when finished
 
 # ==========================
 #  ANTI-TAMPER PROTECTION
 # ==========================
-# NOTE:
-# 1) This HASH must always match the *current* file content.
-# 2) After ANY edit to this script run:  sha256sum premium.sh
-#    Then copy the new hash and paste it here.
 ORIGINAL_HASH="9dd21034a9b58b4ab148665b6675810632c21bf6f83c9cbfd95616b7a6c1ef90"
 
 self_integrity_check() {
 
-    # ========== DEV MODE BYPASS ==========
+    # disable anti-tamper when DEV_MODE is on
     if [[ "$DEV_MODE" == "on" ]]; then
         echo -e "${YELLOW}[DEV MODE] Anti-Tamper disabled. Skipping integrity check...${NC}"
         return 0
     fi
-    # =====================================
 
-    # Skip check if sha256sum is not available (very old systems)
+    # Skip check if sha256sum missing
     if ! command -v sha256sum >/dev/null 2>&1; then
-        echo -e "${ERROR} sha256sum command not found, skipping integrity check.${NC}"
+        echo -e "${ERROR} sha256sum not found, skipping integrity check.${NC}"
         return 0
     fi
 
@@ -54,16 +49,12 @@ self_integrity_check() {
     current_hash=$(sha256sum "$0" | awk '{print $1}')
 
     if [[ "$current_hash" != "$ORIGINAL_HASH" ]]; then
-        echo -e ""
-        echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+        echo -e "\n\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
         echo -e "\033[41;97m          SECURITY ALERT (ANTI-TAMPER)          \033[0m"
         echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-        echo -e ""
         echo -e "  ${RED}Script integrity check FAILED!${NC}"
-        echo -e "  This copy of ${YELLOW}premium.sh${NC} has been modified"
-        echo -e "  and does not match the original signed version."
-        echo -e ""
-        echo -e "  Please download a fresh copy from the official repo."
+        echo -e "  This copy of premium.sh has been modified."
+        echo -e "  Download a fresh copy from the official repo."
         echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
         exit 1
     fi
