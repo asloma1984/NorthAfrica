@@ -5,8 +5,7 @@
 # Channel   » https://t.me/northafrica9
 # Group     » https://t.me/groupnorthafrica
 #
-# Developer » Abdul ( Stable Edition )
-# Recode by North Africa (2025)
+# Stable Edition - Recode 2025
 # All rights reserved to asloma1984 (GitHub)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -30,10 +29,7 @@ export IP=$(curl -sS icanhazip.com)
 # Detect default network interface for vnstat
 NET=$(ip -o -4 route show to default | awk 'NR==1 {print $5}')
 
-# Clear screen a few times
-clear
 clear && clear && clear
-clear; clear; clear
 
 # Banner
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -62,9 +58,7 @@ OS_NAME=$(grep -w PRETTY_NAME /etc/os-release | head -n1 | sed 's/PRETTY_NAME=//
 OS_VERSION_ID=$(grep -w VERSION_ID /etc/os-release | head -n1 | sed 's/VERSION_ID=//g' | sed 's/"//g')
 OS_MAJOR_VERSION=${OS_VERSION_ID%%.*}
 
-if [[ $OS_ID == "ubuntu" ]]; then
-    echo -e "${OK} Your OS is supported ( ${green}${OS_NAME}${NC} )"
-elif [[ $OS_ID == "debian" ]]; then
+if [[ $OS_ID == "ubuntu" || $OS_ID == "debian" ]]; then
     echo -e "${OK} Your OS is supported ( ${green}${OS_NAME}${NC} )"
 else
     echo -e "${ERROR} Your OS is not supported ( ${YELLOW}${OS_NAME}${NC} )"
@@ -136,7 +130,6 @@ license_check() {
     license_denied_expired "$EXP_DATE"
   fi
 
-  # Save to system files used by menu etc.
   rm -f /usr/bin/user /usr/bin/e
   echo "$USERNAME" >/usr/bin/user
   echo "$EXP_DATE" >/usr/bin/e
@@ -144,7 +137,6 @@ license_check() {
   echo -e "${OK} License OK for user ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
 }
 
-# Run license check BEFORE starting heavy installation
 license_check
 #-------------------------------------------------------------------------------
 
@@ -163,23 +155,16 @@ if [ "$(systemd-detect-virt)" == "openvz" ]; then
     exit 1
 fi
 
-red='\e[1;31m'
-green='\e[0;32m'
-NC='\e[0m'
-
 echo -e "\e[32mLoading...\e[0m"
 clear
 
-# Basic dependencies first to avoid errors (curl / socat / netcat / lsof / unzip)
+# Basic dependencies first to avoid errors
 apt update -y
-apt install -y curl socat netcat lsof unzip
-
-apt install -y ruby
+apt install -y curl socat netcat-openbsd lsof unzip ruby
 gem install lolcat
 apt install -y wondershaper
-clear
 
-# REPO (PRIVATE)
+# REPO
 REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/"
 
 start=$(date +%s)
@@ -188,35 +173,10 @@ secs_to_human() {
 }
 
 ### Status helpers
-print_ok() {
-    echo -e "${OK} ${BLUE} $1 ${FONT}"
-}
-print_install() {
-    echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
-    echo -e "${YELLOW} » $1 ${FONT}"
-    echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
-    sleep 1
-}
-print_error() {
-    echo -e "${ERROR} ${REDBG} $1 ${FONT}"
-}
-print_success() {
-    if [[ 0 -eq $? ]]; then
-        echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
-        echo -e "${Green} » $1 successfully installed"
-        echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"
-        sleep 2
-    fi
-}
-
-### Root info helper (not enforced, just info)
-is_root() {
-    if [[ 0 == "$UID" ]]; then
-        print_ok "Root user - starting installation process"
-    else
-        print_error "Current user is not root. Please switch to root and run the script again."
-    fi
-}
+print_ok()        { echo -e "${OK} ${BLUE} $1 ${FONT}"; }
+print_install()   { echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"; echo -e "${YELLOW} » $1 ${FONT}"; echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"; sleep 1; }
+print_error()     { echo -e "${ERROR} ${REDBG} $1 ${FONT}"; }
+print_success()   { if [[ 0 -eq $? ]]; then echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"; echo -e "${Green} » $1 successfully installed"; echo -e "${green} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${FONT}"; sleep 2; fi; }
 
 # Create Xray directory and basic paths
 print_install "Create Xray directories"
@@ -226,8 +186,7 @@ touch /etc/xray/domain
 mkdir -p /var/log/xray
 chown www-data:www-data /var/log/xray
 chmod +x /var/log/xray
-touch /var/log/xray/access.log
-touch /var/log/xray/error.log
+touch /var/log/xray/access.log /var/log/xray/error.log
 mkdir -p /var/lib/kyt >/dev/null 2>&1
 
 # RAM Information
@@ -249,7 +208,7 @@ export Arch=$(uname -m)
 export IP=$(curl -s https://ipinfo.io/ip/)
 
 # --------------------------------------------------------------------
-# Change Environment System + HAProxy install (version-aware)
+# Environment + HAProxy
 # --------------------------------------------------------------------
 first_setup(){
     print_install "System initial setup & HAProxy installation"
@@ -259,34 +218,21 @@ first_setup(){
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
     print_success "Xray directory initialized"
 
-    # Common update first
     apt-get update -y
 
     if [[ $OS_ID == "ubuntu" ]]; then
-        echo "Setup dependencies for ${OS_NAME}"
         apt-get install -y --no-install-recommends software-properties-common
-
-        # Ubuntu: use distro HAProxy for >= 20, PPA only for 18.x
         if [[ ${OS_MAJOR_VERSION} -ge 20 ]]; then
-            echo "Installing HAProxy from Ubuntu official repository..."
             apt-get install -y haproxy
         else
-            echo "Installing HAProxy 2.0 from PPA for older Ubuntu..."
             add-apt-repository -y ppa:vbernat/haproxy-2.0
             apt-get update -y
             apt-get install -y haproxy=2.0.\*
         fi
-
     elif [[ $OS_ID == "debian" ]]; then
-        echo "Setup dependencies for ${OS_NAME}"
-
-        # Debian 11/12 and newer → use official repo
         if [[ ${OS_MAJOR_VERSION} -ge 11 ]]; then
-            echo "Installing HAProxy from Debian official repository..."
             apt-get install -y haproxy
         else
-            # Debian 9/10 → use haproxy.debian.net (1.8)
-            echo "Installing HAProxy 1.8 from haproxy.debian.net for older Debian..."
             curl https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
             echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
                 http://haproxy.debian.net buster-backports-1.8 main \
@@ -294,16 +240,12 @@ first_setup(){
             apt-get update -y
             apt-get install -y haproxy=1.8.\*
         fi
-    else
-        echo -e " Your OS is not supported (${OS_NAME})"
-        exit 1
     fi
 
     print_success "HAProxy installed and base environment prepared"
 }
 
-# GEO PROJECT / Nginx
-clear
+# Nginx
 nginx_install() {
     if [[ $OS_ID == "ubuntu" ]]; then
         print_install "Install nginx for ${OS_NAME}"
@@ -311,8 +253,6 @@ nginx_install() {
     elif [[ $OS_ID == "debian" ]]; then
         print_install "Install nginx for ${OS_NAME}"
         apt -y install nginx
-    else
-        echo -e " Your OS is not supported ( ${YELLOW}${OS_NAME}${FONT} )"
     fi
 }
 
@@ -324,38 +264,28 @@ base_package() {
     apt update -y
     apt install -y zip pwgen openssl socat cron bash-completion figlet
 
-    # FIX: netcat package on Debian 12+ (netcat-openbsd)
+    # netcat & ntpdate for new Debian/Ubuntu
     apt install -y netcat-openbsd
-
-    # FIX: ntpdate removed → use ntpsec-ntpdate
     apt install -y ntpsec-ntpdate
     ntpdate pool.ntp.org || true
 
     apt upgrade -y
     apt dist-upgrade -y || true
 
-    # Install chrony for time sync
     apt install -y chrony
     systemctl enable chrony
     systemctl restart chrony
 
-    # Cleanup
-    sudo apt-get clean all
-    sudo apt-get autoremove -y
+    apt-get clean all
+    apt-get autoremove -y
 
-    # Remove unused services
-    sudo apt-get remove --purge -y exim4 ufw firewalld || true
+    apt-get remove --purge -y exim4 ufw firewalld || true
+    apt-get install -y --no-install-recommends software-properties-common
 
-    # Required dependencies
-    sudo apt-get install -y --no-install-recommends software-properties-common
-
-    # iptables persistent
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-
     apt install -y iptables iptables-persistent netfilter-persistent
 
-    # Big package list
     apt install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config \
         libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev \
         flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev \
@@ -373,29 +303,26 @@ pasang_domain() {
     clear
     echo -e ""
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e " \e[1;32mSelect Domain Type\e[0m"
+    echo -e "  Select Domain Type"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e " \e[1;32m1)\e[0m Use your domain (recommended)"
-    echo -e " \e[1;32m2)\e[0m Use random subdomain via Cloudflare script"
+    echo -e "  1) Use your domain (recommended)"
+    echo -e "  2) Use random subdomain via Cloudflare script"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     read -p " Select 1-2 (or any key for random) : " host
     echo ""
 
     if [[ $host == "1" ]]; then
         echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo -e " \e[1;32mEnter your MAIN domain (example: vpn.yourdomain.com)\e[0m"
+        echo -e "  Enter your MAIN domain (example: vpn.yourdomain.com)"
         echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         read -p " Input Domain : " DOMAIN
-
         if [[ -z "$DOMAIN" ]]; then
             echo -e "\e[31m[ERROR] Domain cannot be empty!\e[0m"
             exit 1
         fi
-
         echo "$DOMAIN" > /etc/xray/domain
         echo "$DOMAIN" > /root/domain
         echo "IP=$DOMAIN" > /var/lib/kyt/ipvps.conf
-
     elif [[ $host == "2" ]]; then
         wget "${REPO}files/cf.sh" -O cf.sh && chmod +x cf.sh && ./cf.sh
         rm -f cf.sh /root/cf.sh
@@ -407,11 +334,10 @@ pasang_domain() {
 
     echo ""
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e " \e[1;32mEnter NS Domain for SlowDNS\e[0m"
-    echo -e " Example: dns.$DOMAIN"
+    echo -e "  Enter NS Domain for SlowDNS"
+    echo -e "  Example: dns.$DOMAIN"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     read -p " Input NS Domain : " NS_DOMAIN
-
     if [[ -z "$NS_DOMAIN" ]]; then
         echo -e "\e[31m[ERROR] NS Domain cannot be empty!\e[0m"
         exit 1
@@ -425,7 +351,6 @@ pasang_domain() {
     export NS_DOMAIN
 }
 
-clear
 # Restart system / Telegram log
 restart_system(){
     CITY=$(curl -s ipinfo.io/city)
@@ -434,8 +359,7 @@ restart_system(){
     clear
     izinsc="$LICENSE_URL"
 
-    rm -f /usr/bin/user
-    rm -f /usr/bin/e
+    rm -f /usr/bin/user /usr/bin/e
     line=$(curl -fsSL "$izinsc" | awk -v ip="$MYIP" '$NF==ip {print}')
     username=$(echo "$line" | awk '{print $2}')
     expx=$(echo "$line" | awk '{print $3}')
@@ -443,7 +367,6 @@ restart_system(){
     echo "$expx" >/usr/bin/e
 
     username=$(cat /usr/bin/user)
-    oid=$(cat /usr/bin/ver 2>/dev/null)
     exp=$(cat /usr/bin/e)
     clear
 
@@ -491,55 +414,41 @@ Automatic notification from private repo."
     curl -s --max-time $TIMES -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" "$URL" >/dev/null
 }
 
-clear
 # Install SSL
 pasang_ssl() {
     clear
     print_install "Installing SSL Certificate"
 
-    # Ensure socat is installed (required for standalone mode)
     apt install -y socat
 
-    # Read domain
     domain=$(cat /root/domain 2>/dev/null || cat /etc/xray/domain 2>/dev/null)
     if [[ -z "$domain" ]]; then
         print_error "Domain not found. Cannot issue SSL certificate."
         return 1
     fi
 
-    # Stop all services that may block port 80
     STOPWEBSERVER=$(lsof -t -i:80)
     if [[ -n "$STOPWEBSERVER" ]]; then
         kill -9 "$STOPWEBSERVER" 2>/dev/null || true
     fi
-    systemctl stop nginx 2>/dev/null || true
-    systemctl stop apache2 2>/dev/null || true
-    systemctl stop haproxy 2>/dev/null || true
-    systemctl stop cockpit 2>/dev/null || true
-    systemctl stop systemd-resolved 2>/dev/null || true
+    systemctl stop nginx apache2 haproxy cockpit systemd-resolved 2>/dev/null || true
 
-    # Clean previous acme installation
     rm -rf /root/.acme.sh
     mkdir -p /root/.acme.sh
 
-    # Install acme.sh
     curl -s https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
     chmod +x /root/.acme.sh/acme.sh
 
-    # Upgrade + Set default CA
     /root/.acme.sh/acme.sh --upgrade --auto-upgrade
     /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
 
-    # Issue SSL certificate
     /root/.acme.sh/acme.sh --issue -d "$domain" --standalone -k ec-256
 
-    # Install certificate to Xray paths
     ~/.acme.sh/acme.sh --installcert -d "$domain" \
         --fullchainpath /etc/xray/xray.crt \
         --keypath /etc/xray/xray.key \
         --ecc
 
-    # Permissions
     chmod 600 /etc/xray/xray.key
     chmod 644 /etc/xray/xray.crt
 
@@ -547,42 +456,21 @@ pasang_ssl() {
 }
 
 make_folder_xray() {
-    rm -rf /etc/vmess/.vmess.db
-    rm -rf /etc/vless/.vless.db
-    rm -rf /etc/trojan/.trojan.db
-    rm -rf /etc/shadowsocks/.shadowsocks.db
-    rm -rf /etc/ssh/.ssh.db
-    rm -rf /etc/bot/.bot.db
-    rm -rf /etc/user-create/user.log
-    mkdir -p /etc/bot
-    mkdir -p /etc/xray
-    mkdir -p /etc/vmess
-    mkdir -p /etc/vless
-    mkdir -p /etc/trojan
-    mkdir -p /etc/shadowsocks
-    mkdir -p /etc/ssh
-    mkdir -p /usr/bin/xray/
-    mkdir -p /var/log/xray/
-    mkdir -p /var/www/html
-    mkdir -p /etc/kyt/limit/vmess/ip
-    mkdir -p /etc/kyt/limit/vless/ip
-    mkdir -p /etc/kyt/limit/trojan/ip
-    mkdir -p /etc/kyt/limit/ssh/ip
-    mkdir -p /etc/limit/vmess
-    mkdir -p /etc/limit/vless
-    mkdir -p /etc/limit/trojan
-    mkdir -p /etc/limit/ssh
-    mkdir -p /etc/user-create
+    rm -rf /etc/vmess/.vmess.db /etc/vless/.vless.db /etc/trojan/.trojan.db \
+           /etc/shadowsocks/.shadowsocks.db /etc/ssh/.ssh.db /etc/bot/.bot.db \
+           /etc/user-create/user.log
+
+    mkdir -p /etc/bot /etc/xray /etc/vmess /etc/vless /etc/trojan /etc/shadowsocks \
+             /etc/ssh /usr/bin/xray /var/log/xray /var/www/html \
+             /etc/kyt/limit/vmess/ip /etc/kyt/limit/vless/ip /etc/kyt/limit/trojan/ip \
+             /etc/kyt/limit/ssh/ip /etc/limit/vmess /etc/limit/vless /etc/limit/trojan \
+             /etc/limit/ssh /etc/user-create
+
     chmod +x /var/log/xray
-    touch /etc/xray/domain
-    touch /var/log/xray/access.log
-    touch /var/log/xray/error.log
-    touch /etc/vmess/.vmess.db
-    touch /etc/vless/.vless.db
-    touch /etc/trojan/.trojan.db
-    touch /etc/shadowsocks/.shadowsocks.db
-    touch /etc/ssh/.ssh.db
-    touch /etc/bot/.bot.db
+    touch /etc/xray/domain /var/log/xray/access.log /var/log/xray/error.log \
+          /etc/vmess/.vmess.db /etc/vless/.vless.db /etc/trojan/.trojan.db \
+          /etc/shadowsocks/.shadowsocks.db /etc/ssh/.ssh.db /etc/bot/.bot.db
+
     echo "& plugin Account" >>/etc/vmess/.vmess.db
     echo "& plugin Account" >>/etc/vless/.vless.db
     echo "& plugin Account" >>/etc/trojan/.trojan.db
@@ -595,21 +483,18 @@ make_folder_xray() {
 install_xray() {
     clear
     print_install "Install Xray Core (latest)"
-    domainSock_dir="/run/xray"; ! [ -d "$domainSock_dir" ] && mkdir "$domainSock_dir"
+    domainSock_dir="/run/xray"; [[ -d "$domainSock_dir" ]] || mkdir "$domainSock_dir"
     chown www-data:www-data "$domainSock_dir"
     
-    # Get latest Xray core
     latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*\"v(.*)\".*/\1/' | head -n 1)"
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version "$latest_version"
  
-    # Get server config
     wget -O /etc/xray/config.json "${REPO}config/config.json" >/dev/null 2>&1
     wget -O /etc/systemd/system/runn.service "${REPO}files/runn.service" >/dev/null 2>&1
     domain=$(cat /etc/xray/domain)
     IPVS=$(cat /etc/xray/ipvps)
     print_success "Xray Core installed"
     
-    # Setup Nginx / HAProxy
     clear
     curl -s ipinfo.io/city >>/etc/xray/city
     curl -s ipinfo.io/org | cut -d " " -f 2-10 >>/etc/xray/isp
@@ -620,11 +505,9 @@ install_xray() {
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
 
-    # Fix common HAProxy config issues (duplicate pidfile, bind-process, missing newline)
+    # Fix HAProxy config
     if [[ -f /etc/haproxy/haproxy.cfg ]]; then
-        # Comment all bind-process lines (to avoid invalid CPU range and deprecation warnings)
         sed -i 's/^[[:space:]]*bind-process/# bind-process disabled by installer /g' /etc/haproxy/haproxy.cfg
-        # Keep first pidfile, comment any additional ones
         awk '
             /^ *pidfile/ {
                 if (seen_pidfile) {
@@ -635,16 +518,12 @@ install_xray() {
             }
             {print}
         ' /etc/haproxy/haproxy.cfg > /etc/haproxy/haproxy.cfg.tmp && mv /etc/haproxy/haproxy.cfg.tmp /etc/haproxy/haproxy.cfg
-        # Ensure file ends with newline
         echo "" >> /etc/haproxy/haproxy.cfg
     fi
     
     cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem >/dev/null
-
     chmod +x /etc/systemd/system/runn.service
 
-    # Create Xray service
-    rm -rf /etc/systemd/system/xray.service.d
     cat >/etc/systemd/system/xray.service <<EOF
 [Unit]
 Description=Xray Service
@@ -675,29 +554,8 @@ ssh(){
     wget -O /etc/pam.d/common-password "${REPO}files/password"
     chmod +x /etc/pam.d/common-password
 
-    DEBIAN_FRONTEND=noninteractive dpkg-reconfigure keyboard-configuration
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/altgr select The default for the keyboard layout"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/compose select No compose key"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/ctrl_alt_bksp boolean false"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/layoutcode string de"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/layout select English"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/modelcode string pc105"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/model select Generic 105-key (Intl) PC"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/optionscode string "
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/store_defaults_in_debconf_db boolean true"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/switch select No temporary switch"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/toggle select No toggling"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/unsupported_config_layout boolean true"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/unsupported_config_options boolean true"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/unsupported_layout boolean true"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/unsupported_options boolean true"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/variantcode string "
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/variant select English"
-    debconf-set-selections <<<"keyboard-configuration keyboard-configuration/xkb-keymap select "
+    DEBIAN_FRONTEND=noninteractive dpkg-reconfigure keyboard-configuration || true
 
-    cd
-
-    # rc-local service
     cat > /etc/systemd/system/rc-local.service <<-END
 [Unit]
 Description=/etc/rc.local
@@ -716,30 +574,22 @@ END
     cat > /etc/rc.local <<-END
 #!/bin/sh -e
 # rc.local
-# By default this script does nothing.
 exit 0
 END
 
     chmod +x /etc/rc.local
-
     systemctl enable rc-local
     systemctl start rc-local.service
 
-    # disable ipv6
     echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6
     sed -i '$ i\echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6' /etc/rc.local
 
-    # set time GMT +7
     ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-
-    # set locale
-    sed -i 's/AcceptEnv/#AcceptEnv/g' /etc/ssh/sshd_config
+    sed -i 's/AcceptEnv/#AcceptEnv/g' /etc/ssh/sshd_config 2>/dev/null || true
     print_success "SSH password configuration"
 }
 
-password_default(){
-    : # no-op (kept for compatibility)
-}
+password_default(){ :; }
 
 udp_mini(){
     clear
@@ -752,18 +602,12 @@ udp_mini(){
     wget -q -O /etc/systemd/system/udp-mini-1.service "${REPO}files/udp-mini-1.service"
     wget -q -O /etc/systemd/system/udp-mini-2.service "${REPO}files/udp-mini-2.service"
     wget -q -O /etc/systemd/system/udp-mini-3.service "${REPO}files/udp-mini-3.service"
-    systemctl.disable udp-mini-1 2>/dev/null
-    systemctl.stop udp-mini-1 2>/dev/null
-    systemctl.enable udp-mini-1
-    systemctl.start udp-mini-1
-    systemctl.disable udp-mini-2 2>/dev/null
-    systemctl.stop udp-mini-2 2>/dev/null
-    systemctl.enable udp-mini-2
-    systemctl.start udp-mini-2
-    systemctl.disable udp-mini-3 2>/dev/null
-    systemctl.stop udp-mini-3 2>/dev/null
-    systemctl.enable udp-mini-3
-    systemctl.start udp-mini-3
+
+    systemctl disable udp-mini-1 udp-mini-2 udp-mini-3 2>/dev/null || true
+    systemctl stop    udp-mini-1 udp-mini-2 udp-mini-3 2>/dev/null || true
+    systemctl enable  udp-mini-1 udp-mini-2 udp-mini-3
+    systemctl start   udp-mini-1 udp-mini-2 udp-mini-3
+
     print_success "Limit IP Service"
 }
 
@@ -778,7 +622,6 @@ install_slowdns() {
 
     mkdir -p "$CONFIG_DIR"
 
-    # Read NS domain
     NS_DOMAIN=$(cat /etc/slowdns/ns 2>/dev/null)
     if [[ -z "$NS_DOMAIN" ]]; then
         echo -e "\e[31m[ERROR] NS Domain not found! Did you forget to set it in pasang_domain()?\e[0m"
@@ -786,7 +629,6 @@ install_slowdns() {
         return 1
     fi
 
-    # Detect architecture
     ARCH=$(uname -m)
     case "$ARCH" in
         x86_64)  BIN="dnstt-server-linux-amd64" ;;
@@ -796,11 +638,9 @@ install_slowdns() {
         *) echo -e "\e[31mUnsupported architecture: $ARCH\e[0m"; exit 1 ;;
     esac
 
-    # Download server
     wget -q -O "$INSTALL_DIR/dnstt-server" "$DNSTT_URL/$BIN"
     chmod +x "$INSTALL_DIR/dnstt-server"
 
-    # Generate DNSTT keys
     "$INSTALL_DIR/dnstt-server" -gen-key \
         -privkey-file "$CONFIG_DIR/server.key" \
         -pubkey-file "$CONFIG_DIR/server.pub"
@@ -809,13 +649,11 @@ install_slowdns() {
     echo "$PUBKEY" > "$CONFIG_DIR/public.key"
     echo "$PUBKEY" > /etc/xray/slowdns_pub
 
-    # Firewall + NAT
     iptables -I INPUT -p udp --dport "$DNSTT_PORT" -j ACCEPT
     iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-port "$DNSTT_PORT"
     netfilter-persistent save >/dev/null 2>&1
     netfilter-persistent reload >/dev/null 2>&1
 
-    # systemd service
 cat > /etc/systemd/system/slowdns.service << EOF
 [Unit]
 Description=SlowDNS (DNSTT) Server
@@ -840,8 +678,24 @@ ins_SSHD(){
     clear
     print_install "Install SSHD"
     wget -q -O /etc/ssh/sshd_config "${REPO}files/sshd" >/dev/null 2>&1
-    chmod 700 /etc/ssh/sshd_config
-    /etc/init.d/ssh restart
+    chmod 600 /etc/ssh/sshd_config
+
+    # Banner for SSH
+    if ! grep -q '^Banner /etc/kyt.txt' /etc/ssh/sshd_config 2>/dev/null; then
+        echo "Banner /etc/kyt.txt" >> /etc/ssh/sshd_config
+    fi
+
+    # HTTP Custom / SlowDNS compatibility (old algorithms)
+    if ! grep -q 'diffie-hellman-group1-sha1' /etc/ssh/sshd_config 2>/dev/null; then
+        echo "KexAlgorithms +diffie-hellman-group1-sha1,diffie-hellman-group14-sha1" >> /etc/ssh/sshd_config
+    fi
+    if ! grep -q 'aes128-cbc' /etc/ssh/sshd_config 2>/dev/null; then
+        echo "Ciphers +aes128-cbc,aes256-cbc,3des-cbc" >> /etc/ssh/sshd_config
+    fi
+    if ! grep -q 'hmac-sha1' /etc/ssh/sshd_config 2>/dev/null; then
+        echo "MACs +hmac-sha1,hmac-md5" >> /etc/ssh/sshd_config
+    fi
+
     systemctl restart ssh
     /etc/init.d/ssh status || true
     print_success "SSHD"
@@ -952,19 +806,13 @@ ins_swab(){
 ins_Fail2ban(){
     clear
     print_install "Install Fail2ban & banner"
-    # (Optional) real fail2ban install is still commented
-    #apt -y install fail2ban > /dev/null 2>&1
-    #systemctl enable --now fail2ban
-    #/etc/init.d/fail2ban restart
 
-    if [ -d '/usr/local/ddos' ]; then
-        rm -rf /usr/local/ddos
+    # Banner for SSH (idempotent)
+    if ! grep -q '^Banner /etc/kyt.txt' /etc/ssh/sshd_config 2>/dev/null; then
+        echo "Banner /etc/kyt.txt" >>/etc/ssh/sshd_config
     fi
-    mkdir -p /usr/local/ddos
 
-    echo "Banner /etc/kyt.txt" >>/etc/ssh/sshd_config
     sed -i 's@DROPBEAR_BANNER=""@DROPBEAR_BANNER="/etc/kyt.txt"@g' /etc/default/dropbear
-
     wget -O /etc/kyt.txt "${REPO}files/issue.net"
     print_success "Fail2ban & banner"
 }
@@ -979,8 +827,8 @@ ins_epro(){
     chmod +x /usr/bin/ws
     chmod 644 /usr/bin/tun.conf
 
-    systemctl disable ws 2>/dev/null
-    systemctl stop ws 2>/dev/null
+    systemctl disable ws 2>/dev/null || true
+    systemctl stop ws 2>/dev/null || true
     systemctl enable ws
     systemctl start ws
     systemctl restart ws
@@ -1002,9 +850,9 @@ ins_epro(){
     iptables -A FORWARD -m string --algo bm --string "announce" -j DROP
     iptables -A FORWARD -m string --algo bm --string "info_hash" -j DROP
     iptables-save > /etc/iptables.up.rules
-    iptables-restore -t < /etc/iptables.up.rules
-    netfilter-persistent.save
-    netfilter-persistent.reload
+    iptables-restore < /etc/iptables.up.rules
+    netfilter-persistent save
+    netfilter-persistent reload
 
     cd
     apt autoclean -y >/dev/null 2>&1
@@ -1031,19 +879,17 @@ ins_restart(){
     systemctl enable --now rc-local
     systemctl enable --now dropbear
     systemctl enable --now openvpn
-    systemctl.enable --now cron
-    systemctl.enable --now haproxy
-    systemctl.enable --now netfilter-persistent
-    systemctl.enable --now ws
-    systemctl.enable --now fail2ban 2>/dev/null || true
+    systemctl enable --now cron
+    systemctl enable --now haproxy
+    systemctl enable --now netfilter-persistent
+    systemctl enable --now ws
+    systemctl enable --now fail2ban 2>/dev/null || true
 
     history -c
     echo "unset HISTFILE" >> /etc/profile
 
     cd
-    rm -f /root/openvpn
-    rm -f /root/key.pem
-    rm -f /root/cert.pem
+    rm -f /root/openvpn /root/key.pem /root/cert.pem
     print_success "All services restarted"
 }
 
@@ -1055,8 +901,7 @@ menu(){
     unzip menu.zip
     chmod +x menu/*
     mv menu/* /usr/local/sbin
-    rm -rf menu
-    rm -rf menu.zip
+    rm -rf menu menu.zip
 }
 
 # Default profile / cron
@@ -1106,7 +951,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 END
 
     echo "*/1 * * * * root echo -n > /var/log/nginx/access.log" >/etc/cron.d/log.nginx
-    echo "*/1 * * * * root echo -n > /var/log/xray/access.log" >>/etc/cron.d/log.xray
+    echo "*/1 * * * * root echo -n > /var/log/xray/access.log" >/etc/cron.d/log.xray
     service cron restart
 
     cat >/home/daily_reboot <<-END
@@ -1134,7 +979,6 @@ EOF
     cat >/etc/rc.local <<EOF
 #!/bin/sh -e
 # rc.local
-# By default this script does nothing.
 iptables -I INPUT -p udp --dport 5300 -j ACCEPT
 iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
 systemctl restart netfilter-persistent
@@ -1159,13 +1003,13 @@ enable_services(){
     print_install "Enable services"
     systemctl daemon-reload
     systemctl start netfilter-persistent
-    systemctl.enable --now rc-local
-    systemctl.enable --now cron
-    systemctl.enable --now netfilter-persistent
-    systemctl.restart nginx
-    systemctl.restart xray
-    systemctl.restart cron
-    systemctl.restart haproxy
+    systemctl enable --now rc-local
+    systemctl enable --now cron
+    systemctl enable --now netfilter-persistent
+    systemctl restart nginx
+    systemctl restart xray
+    systemctl restart cron
+    systemctl restart haproxy
     print_success "Services enabled"
     clear
 }
@@ -1202,14 +1046,9 @@ instal(){
 instal
 echo ""
 history -c
-rm -rf /root/menu
-rm -rf /root/*.zip
-rm -rf /root/*.sh
-rm -rf /root/LICENSE
-rm -rf /root/README.md
-rm -rf /root/domain
+rm -rf /root/menu /root/*.zip /root/*.sh /root/LICENSE /root/README.md /root/domain
 secs_to_human "$(($(date +%s) - ${start}))"
-sudo hostnamectl set-hostname "$USERNAME"
+hostnamectl set-hostname "$USERNAME"
 echo -e "${green} Installation finished! Now you can enjoy NorthAfrica Script.${NC}"
 echo ""
 read -p "$( echo -e "Press ${YELLOW}[ ${NC}${YELLOW}Enter${NC} ${YELLOW}]${NC} to reboot") " _
