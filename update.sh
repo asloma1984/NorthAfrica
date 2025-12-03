@@ -1,15 +1,11 @@
 #!/bin/bash
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9 to 13 / Ubuntu 18 to 25
-# Developer  » Abdul (NorthAfrica Script)
-# Channel    » https://t.me/northafrica9
-# Group      » https://t.me/groupnorthafrica
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# North Africa Script
-# Year        » 2025
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script - Update System
+# Year: 2025
 
 clear
+
+# Install lolcat if missing
+apt install -y lolcat > /dev/null 2>&1
 
 fun_bar() {
 CMD[0]="$1"
@@ -38,9 +34,9 @@ echo -e "\033[0;33m]\033[1;37m -\033[1;32m DONE !\033[1;37m"
 tput cnorm
 }
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Start Update Function
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# =======================================
+# UPDATE FUNCTION
+# =======================================
 
 res1() {
 cd /root || exit
@@ -60,31 +56,33 @@ echo ""
 echo -e "\033[1;36m🔄 Updating main installer (premium.sh)...\033[0m"
 
 wget -q https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/premium.sh -O /root/premium.sh
-chmod +x /root/premium.sh >/dev/null 2>&1
+chmod +x /root/premium.sh
 
 echo -e "\033[1;32m✅ premium.sh updated successfully.\033[0m"
 
-rm -rf /root/update.sh
+rm -f /root/update.sh
 }
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Run Update Process
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# =======================================
+# RUN UPDATE
+# =======================================
 
 clear
-echo -e ""
-echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
-echo -e "\e[1;97;101m          » UPDATE NORTH AFRICA SCRIPT «          \033[0m"
-echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
-echo -e ""
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+echo -e "\e[1;97;101m       » UPDATE NORTH AFRICA SCRIPT «       \033[0m"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+echo ""
 echo -e "\033[1;91mUpdating Script Components... Please wait...\033[1;37m"
 
 fun_bar res1
 
-echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
-echo -e ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
+echo ""
 echo -e "\033[1;32mAll components have been updated successfully!\033[0m"
-echo -e "\033[1;33mChannel: t.me/Abdulsalam403 | Group: https://t.me/groupnorthafrica\033[0m"
+echo -e "\033[1;33mChannel: t.me/Abdulsalam403 | Group: t.me/groupnorthafrica\033[0m"
 echo ""
 read -n 1 -s -r -p "Press [ Enter ] to return to menu"
-menu
+
+# Only run menu if exists
+command -v menu >/dev/null 2>&1 && menu
