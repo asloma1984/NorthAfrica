@@ -4,34 +4,46 @@
 
 clear
 
-# Install lolcat if missing
-apt install -y lolcat > /dev/null 2>&1
+# Ensure required packages
+apt update -y >/dev/null 2>&1
+apt install -y wget unzip lolcat >/dev/null 2>&1
 
 fun_bar() {
-CMD[0]="$1"
-CMD[1]="$2"
-(
-    [[ -e $HOME/fim ]] && rm $HOME/fim
-    ${CMD[0]} >/dev/null 2>&1
-    ${CMD[1]} >/dev/null 2>&1
-    touch $HOME/fim
-) >/dev/null 2>&1 &
-tput civis
-echo -ne "\033[0;33mPlease wait updating \033[1;37m- \033[0;33m["
-while true; do
-    for ((i = 0; i < 18; i++)); do
-        echo -ne "\033[0;32m#"
-        sleep 0.1s
-    done
-    [[ -e $HOME/fim ]] && rm $HOME/fim && break
-    echo -e "\033[0;33m]"
-    sleep 1s
-    tput cuu1
-    tput dl1
+    CMD[0]="$1"
+    CMD[1]="$2"
+    (
+        [[ -e "$HOME/fim" ]] && rm -f "$HOME/fim"
+
+        # First command (required)
+        [[ -n "${CMD[0]}" ]] && ${CMD[0]} >/dev/null 2>&1
+
+        # Second command (optional)
+        [[ -n "${CMD[1]}" ]] && ${CMD[1]} >/dev/null 2>&1
+
+        touch "$HOME/fim"
+    ) >/dev/null 2>&1 &
+
+    tput civis
     echo -ne "\033[0;33mPlease wait updating \033[1;37m- \033[0;33m["
-done
-echo -e "\033[0;33m]\033[1;37m -\033[1;32m DONE !\033[1;37m"
-tput cnorm
+
+    while true; do
+        for ((i = 0; i < 18; i++)); do
+            echo -ne "\033[0;32m#"
+            sleep 0.1s
+        done
+        if [[ -e "$HOME/fim" ]]; then
+            rm -f "$HOME/fim"
+            break
+        fi
+        echo -e "\033[0;33m]"
+        sleep 1s
+        tput cuu1
+        tput dl1
+        echo -ne "\033[0;33mPlease wait updating \033[1;37m- \033[0;33m["
+    done
+
+    echo -e "\033[0;33m]\033[1;37m -\033[1;32m DONE !\033[1;37m"
+    tput cnorm
 }
 
 # =======================================
@@ -39,28 +51,30 @@ tput cnorm
 # =======================================
 
 res1() {
-cd /root || exit
-echo ""
-echo -e "\033[1;36m🔄 Downloading latest menu update...\033[0m"
+    cd /root || exit 1
 
-wget -q https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/menu/menu.zip -O menu.zip
-unzip -o menu.zip >/dev/null 2>&1
-chmod +x menu/* >/dev/null 2>&1
-mv -f menu/* /usr/local/sbin >/dev/null 2>&1
-rm -rf menu menu.zip
+    echo ""
+    echo -e "\033[1;36m🔄 Downloading latest menu update...\033[0m"
 
-echo ""
-echo -e "\033[1;32m✅ Menu scripts updated successfully.\033[0m"
+    wget -q "https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/menu/menu.zip" -O menu.zip
+    unzip -o menu.zip >/dev/null 2>&1
+    chmod +x menu/* >/dev/null 2>&1
+    mv -f menu/* /usr/local/sbin >/dev/null 2>&1
+    rm -rf menu menu.zip
 
-echo ""
-echo -e "\033[1;36m🔄 Updating main installer (premium.sh)...\033[0m"
+    echo ""
+    echo -e "\033[1;32m✅ Menu scripts updated successfully.\033[0m"
 
-wget -q https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/premium.sh -O /root/premium.sh
-chmod +x /root/premium.sh
+    echo ""
+    echo -e "\033[1;36m🔄 Updating main installer (premium.sh)...\033[0m"
 
-echo -e "\033[1;32m✅ premium.sh updated successfully.\033[0m"
+    wget -q "https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/premium.sh" -O /root/premium.sh
+    chmod +x /root/premium.sh >/dev/null 2>&1
 
-rm -f /root/update.sh
+    echo -e "\033[1;32m✅ premium.sh updated successfully.\033[0m"
+
+    # Remove this updater after successful update
+    rm -f /root/update.sh
 }
 
 # =======================================
@@ -75,6 +89,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo -e "\033[1;91mUpdating Script Components... Please wait...\033[1;37m"
 
+# Run progress bar with update function
 fun_bar res1
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | lolcat
@@ -85,4 +100,6 @@ echo ""
 read -n 1 -s -r -p "Press [ Enter ] to return to menu"
 
 # Only run menu if exists
-command -v menu >/dev/null 2>&1 && menu
+if command -v menu >/dev/null 2>&1; then
+    menu
+fi
