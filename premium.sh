@@ -320,41 +320,50 @@ nginx_install() {
 base_package() {
     clear
     print_install "Install required packages"
-    apt install -y zip pwgen openssl netcat socat cron bash-completion
-    apt install -y figlet
+
     apt update -y
+    apt install -y zip pwgen openssl socat cron bash-completion figlet
+
+    # FIX: netcat package on Debian 12+ (netcat-openbsd)
+    apt install -y netcat-openbsd
+
+    # FIX: ntpdate removed → use ntpsec-ntpdate
+    apt install -y ntpsec-ntpdate
+    ntpdate pool.ntp.org || true
+
     apt upgrade -y
     apt dist-upgrade -y || true
 
-    systemctl enable chronyd 2>/dev/null || true
-    systemctl restart chronyd 2>/dev/null || true
-    systemctl enable chrony 2>/dev/null || true
-    systemctl restart chrony 2>/dev/null || true
-    chronyc sourcestats -v 2>/dev/null || true
-    chronyc tracking -v 2>/dev/null || true
+    # Install chrony for time sync
+    apt install -y chrony
+    systemctl enable chrony
+    systemctl restart chrony
 
-    apt install -y ntpdate
-    ntpdate pool.ntp.org || true
-    apt install -y sudo
+    # Cleanup
     sudo apt-get clean all
     sudo apt-get autoremove -y
-    sudo apt-get install -y debconf-utils
-    sudo apt-get remove --purge -y exim4 || true
-    sudo apt-get remove --purge -y ufw firewalld || true
+
+    # Remove unused services
+    sudo apt-get remove --purge -y exim4 ufw firewalld || true
+
+    # Required dependencies
     sudo apt-get install -y --no-install-recommends software-properties-common
 
+    # iptables persistent
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
 
-    sudo apt-get install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config \
+    apt install -y iptables iptables-persistent netfilter-persistent
+
+    # Big package list
+    apt install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config \
         libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev \
         flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev \
         libssl-dev libsqlite3-dev sed dirmngr libxml-parser-perl build-essential \
-        gcc g++ python htop lsof tar wget curl ruby zip unzip p7zip-full python3-pip \
-        libc6 util-linux build-essential msmtp-mta ca-certificates bsd-mailx \
-        iptables iptables-persistent netfilter-persistent net-tools openssl \
-        ca-certificates gnupg gnupg2 lsb-release shc cmake git screen socat \
-        xz-utils apt-transport-https gnupg1 dnsutils cron ntpdate chrony jq openvpn easy-rsa
+        gcc g++ python3 python3-pip htop lsof tar wget curl ruby zip unzip p7zip-full \
+        libc6 util-linux msmtp-mta ca-certificates bsd-mailx \
+        net-tools openssl gnupg gnupg2 lsb-release shc cmake git screen \
+        xz-utils apt-transport-https dnsutils jq openvpn easy-rsa
 
     print_success "Required packages installed"
 }
