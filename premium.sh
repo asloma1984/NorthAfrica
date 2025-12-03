@@ -468,29 +468,55 @@ clear
 # Install SSL
 pasang_ssl() {
     clear
-    print_install "Install SSL certificate for domain"
-    rm -rf /etc/xray/xray.key
-    rm -rf /etc/xray/xray.crt
+    print_install "Installing SSL Certificate"
+
+    # Ensure socat is installed (required for standalone mode)
+    apt install -y socat
+
+    # Read domain
     domain=$(cat /root/domain 2>/dev/null || cat /etc/xray/domain 2>/dev/null)
     if [[ -z "$domain" ]]; then
-        print_error "Domain file /root/domain or /etc/xray/domain not found. Cannot issue certificate."
-        return
+        print_error "Domain not found. Cannot issue SSL certificate."
+        return 1
     fi
-    STOPWEBSERVER=$(lsof -i:80 | awk 'NR==2 {print $1}')
-    rm -rf /root/.acme.sh
-    mkdir /root/.acme.sh
+
+    # Stop all services that may block port 80
+    STOPWEBSERVER=$(lsof -t -i:80)
     if [[ -n "$STOPWEBSERVER" ]]; then
-        systemctl stop "$STOPWEBSERVER" 2>/dev/null || true
+        kill -9 "$STOPWEBSERVER" 2>/dev/null || true
     fi
     systemctl stop nginx 2>/dev/null || true
-    curl https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
+    systemctl stop apache2 2>/dev/null || true
+    systemctl stop haproxy 2>/dev/null || true
+    systemctl stop cockpit 2>/dev/null || true
+    systemctl stop systemd-resolved 2>/dev/null || true
+
+    # Clean previous acme installation
+    rm -rf /root/.acme.sh
+    mkdir -p /root/.acme.sh
+
+    # Install acme.sh
+    curl -s https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
     chmod +x /root/.acme.sh/acme.sh
+
+    # Upgrade + Set default CA
     /root/.acme.sh/acme.sh --upgrade --auto-upgrade
     /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+
+    # Issue SSL certificate
     /root/.acme.sh/acme.sh --issue -d "$domain" --standalone -k ec-256
-    ~/.acme.sh/acme.sh --installcert -d "$domain" --fullchainpath /etc/xray/xray.crt --keypath /etc/xray/xray.key --ecc
-    chmod 777 /etc/xray/xray.key
-    print_success "SSL Certificate installed"
+
+    # Install certificate to Xray paths
+    ~/.acme.sh/acme.sh --installcert -d "$domain" \
+        --fullchainpath /etc/xray/xray.crt \
+        --keypath /etc/xray/xray.key \
+        --ecc
+
+    # Permissions
+    chmod 600 /etc/xray/xray.key
+    chmod 644 /etc/xray/xray.crt
+
+    print_success "SSL Certificate successfully installed"
 }
 
 make_folder_xray() {
