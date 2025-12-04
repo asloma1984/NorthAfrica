@@ -23,11 +23,122 @@ NC='\e[0m'
 red='\e[1;31m'
 green='\e[0;32m'
 
+# ─────────────────────────────────────────────────────
+# Core helpers: root, DNS, early deps, OS detection, services
+# ─────────────────────────────────────────────────────
+
+require_root() {
+  if [[ $EUID -ne 0 ]]; then
+    echo -e "${ERROR} You need to run this script as root (use sudo).${NC}"
+    exit 1
+  fi
+}
+
+fix_dns() {
+  # Try to fix DNS issues before using apt/curl/wget
+  if ! ping -c1 -W2 8.8.8.8 >/dev/null 2>&1; then
+    # No connectivity to internet at all, nothing to fix here
+    return
+  fi
+
+  if ! ping -c1 -W2 google.com >/dev/null 2>&1; then
+    echo -e "${YELLOW}[*] DNS appears to be broken, applying temporary fix...${NC}"
+    rm -f /etc/resolv.conf 2>/dev/null
+    {
+      echo "nameserver 8.8.8.8"
+      echo "nameserver 1.1.1.1"
+    } >/etc/resolv.conf
+
+    if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q "^systemd-resolved.service"; then
+      systemctl restart systemd-resolved 2>/dev/null || true
+    fi
+  fi
+}
+
+ensure_early_dependencies() {
+  # Minimal tools required very early in the script
+  if ! command -v apt-get >/dev/null 2>&1; then
+    return
+  fi
+  apt-get update -y >/dev/null 2>&1 || true
+  apt-get install -y \
+    curl wget ca-certificates iproute2 dnsutils net-tools \
+    lsb-release gnupg gnupg2 >/dev/null 2>&1 || true
+}
+
+detect_os() {
+  if [[ -r /etc/os-release ]]; then
+    . /etc/os-release
+    OS_ID="$ID"
+    OS_NAME="$PRETTY_NAME"
+    OS_VERSION_ID="$VERSION_ID"
+    OS_MAJOR_VERSION="${OS_VERSION_ID%%.*}"
+  else
+    echo -e "${ERROR} Cannot detect operating system (missing /etc/os-release).${NC}"
+    exit 1
+  fi
+
+  if [[ "$OS_ID" != "ubuntu" && "$OS_ID" != "debian" ]]; then
+    echo -e "${ERROR} Your OS is not supported ( ${YELLOW}${OS_NAME}${NC} )"
+    exit 1
+  fi
+
+  # Version validation for the range you want to support
+  if [[ "$OS_ID" == "ubuntu" ]]; then
+    case "$OS_MAJOR_VERSION" in
+      18|20|22|24|25) : ;;
+      *)
+        echo -e "${ERROR} Ubuntu version ${YELLOW}${OS_VERSION_ID}${NC} is not supported (allowed: 18/20/22/24/25)."
+        exit 1
+      ;;
+    esac
+  elif [[ "$OS_ID" == "debian" ]]; then
+    case "$OS_MAJOR_VERSION" in
+      9|10|11|12|13) : ;;
+      *)
+        echo -e "${ERROR} Debian version ${YELLOW}${OS_VERSION_ID}${NC} is not supported (allowed: 9–13)."
+        exit 1
+      ;;
+    esac
+  fi
+}
+
+restart_service() {
+  # Safe service restart that works on both systemd and SysV init
+  local svc="$1"
+
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q "^${svc}.service"; then
+    systemctl restart "$svc" 2>/dev/null && return 0
+  fi
+
+  if [[ -x "/etc/init.d/${svc}" ]]; then
+    "/etc/init.d/${svc}" restart 2>/dev/null && return 0
+  fi
+
+  echo -e "${YELLOW}Warning: service ${svc} is not available on this system.${NC}"
+  return 1
+}
+
+# ─────────────────────────────────────────────────────
+# Start: basic checks & banner
+# ─────────────────────────────────────────────────────
+
 clear
-# Export public IP
-export IP=$(curl -sS icanhazip.com)
+
+require_root
+fix_dns
+ensure_early_dependencies
+detect_os
+
+# Export public IP (after making sure curl exists)
+if command -v curl >/dev/null 2>&1; then
+  export IP=$(curl -sS icanhazip.com || echo "")
+else
+  export IP=""
+fi
+
 # Detect default network interface for vnstat
-NET=$(ip -o -4 route show to default | awk 'NR==1 {print $5}')
+NET=$(ip -o -4 route show to default 2>/dev/null | awk 'NR==1 {print $5}')
 
 clear && clear && clear
 
@@ -52,18 +163,8 @@ else
     exit 1
 fi
 
-# OS detection
-OS_ID=$(grep -w ID /etc/os-release | head -n1 | sed 's/ID=//g' | sed 's/"//g')
-OS_NAME=$(grep -w PRETTY_NAME /etc/os-release | head -n1 | sed 's/PRETTY_NAME=//g' | sed 's/"//g')
-OS_VERSION_ID=$(grep -w VERSION_ID /etc/os-release | head -n1 | sed 's/VERSION_ID=//g' | sed 's/"//g')
-OS_MAJOR_VERSION=${OS_VERSION_ID%%.*}
-
-if [[ $OS_ID == "ubuntu" || $OS_ID == "debian" ]]; then
-    echo -e "${OK} Your OS is supported ( ${green}${OS_NAME}${NC} )"
-else
-    echo -e "${ERROR} Your OS is not supported ( ${YELLOW}${OS_NAME}${NC} )"
-    exit 1
-fi
+# OS detection (already done by detect_os, but keep this section for compatibility output)
+echo -e "${OK} Your OS is supported ( ${green}${OS_NAME}${NC} )"
 
 # IP validation
 if [[ -z "$IP" ]]; then
@@ -75,7 +176,7 @@ fi
 #-------------------------------------------------------------------------------
 #  LICENSE / REGISTER CHECK (PRIVATE)
 #-------------------------------------------------------------------------------
-MYIP=$(curl -sS ipv4.icanhazip.com)
+MYIP=$(curl -sS ipv4.icanhazip.com 2>/dev/null || echo "")
 LICENSE_URL="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/register"
 
 license_denied_not_registered() {
@@ -110,7 +211,7 @@ license_denied_expired() {
 
 license_check() {
   local data line
-  data=$(curl -fsSL "$LICENSE_URL") || {
+  data=$(curl -fsSL "$LICENSE_URL" 2>/dev/null) || {
     echo -e "${ERROR} Unable to fetch license data from register."
     license_denied_not_registered
   }
@@ -145,12 +246,13 @@ read -p "$(echo -e "Press ${GRAY}[ ${NC}${green}Enter${NC} ${GRAY}]${NC} to star
 echo ""
 clear
 
+# Root re-check (kept for compatibility, though require_root already checked)
 if [ "${EUID}" -ne 0 ]; then
     echo "You need to run this script as root"
     exit 1
 fi
 
-if [ "$(systemd-detect-virt)" == "openvz" ]; then
+if command -v systemd-detect-virt >/dev/null 2>&1 && [ "$(systemd-detect-virt)" == "openvz" ]; then
     echo "OpenVZ is not supported"
     exit 1
 fi
@@ -158,9 +260,9 @@ fi
 echo -e "\e[32mLoading...\e[0m"
 clear
 
-# Basic dependencies first to avoid errors
+# Basic dependencies first to avoid errors (extended with wget & ca-certificates & dnsutils)
 apt update -y
-apt install -y curl socat netcat-openbsd lsof unzip ruby
+apt install -y curl wget ca-certificates dnsutils net-tools socat netcat-openbsd lsof unzip ruby
 gem install lolcat
 apt install -y wondershaper
 
@@ -190,6 +292,8 @@ touch /var/log/xray/access.log /var/log/xray/error.log
 mkdir -p /var/lib/kyt >/dev/null 2>&1
 
 # RAM Information
+mem_used=0
+mem_total=0
 while IFS=":" read -r a b; do
     case $a in
         "MemTotal") ((mem_used+=${b/kB})); mem_total="${b/kB}" ;;
@@ -213,9 +317,9 @@ export IP=$(curl -s https://ipinfo.io/ip/)
 first_setup(){
     print_install "System initial setup & HAProxy installation"
 
-    timedatectl set-timezone Asia/Jakarta
-    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
-    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+    timedatectl set-timezone Asia/Jakarta 2>/dev/null || true
+    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections 2>/dev/null || true
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections 2>/dev/null || true
     print_success "Xray directory initialized"
 
     apt-get update -y
@@ -280,7 +384,7 @@ base_package() {
     apt-get autoremove -y
 
     apt-get remove --purge -y exim4 ufw firewalld || true
-    apt-get install -y --no-install-recommends software-properties-common
+    apt-get install -y --no-install-recommends software-properties-common debconf-utils
 
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
@@ -707,8 +811,8 @@ ins_dropbear(){
     apt-get install -y dropbear > /dev/null 2>&1
     wget -q -O /etc/default/dropbear "${REPO}config/dropbear.conf"
     chmod +x /etc/default/dropbear
-    /etc/init.d/dropbear restart
-    /etc/init.d/dropbear status || true
+    restart_service dropbear
+    /etc/init.d/dropbear status 2>/dev/null || true
     print_success "Dropbear"
 }
 
@@ -716,7 +820,7 @@ ins_vnstat(){
     clear
     print_install "Install Vnstat"
     apt -y install vnstat > /dev/null 2>&1
-    /etc/init.d/vnstat restart
+    restart_service vnstat
     apt -y install libsqlite3-dev > /dev/null 2>&1
     wget https://humdi.net/vnstat/vnstat-2.6.tar.gz
     tar zxvf vnstat-2.6.tar.gz
@@ -726,9 +830,9 @@ ins_vnstat(){
     vnstat -u -i "$NET"
     sed -i "s/Interface \"eth0\"/Interface \"$NET\"/g" /etc/vnstat.conf
     chown vnstat:vnstat /var/lib/vnstat -R
-    systemctl enable vnstat
-    /etc/init.d/vnstat restart
-    /etc/init.d/vnstat status || true
+    systemctl enable vnstat 2>/dev/null || true
+    restart_service vnstat
+    /etc/init.d/vnstat status 2>/dev/null || true
     rm -f /root/vnstat-2.6.tar.gz
     rm -rf /root/vnstat-2.6
     print_success "Vnstat"
@@ -738,7 +842,7 @@ ins_openvpn(){
     clear
     print_install "Install OpenVPN"
     wget "${REPO}files/openvpn" -O openvpn && chmod +x openvpn && ./openvpn
-    /etc/init.d/openvpn restart
+    restart_service openvpn
     print_success "OpenVPN"
 }
 
@@ -863,26 +967,27 @@ ins_epro(){
 ins_restart(){
     clear
     print_install "Restarting all services"
-    /etc/init.d/nginx restart
-    /etc/init.d/openvpn restart
-    /etc/init.d/ssh restart
-    /etc/init.d/dropbear restart
-    /etc/init.d/fail2ban restart 2>/dev/null || true
-    /etc/init.d/vnstat restart
-    systemctl restart haproxy
-    /etc/init.d/cron restart
+
+    restart_service nginx
+    restart_service openvpn
+    restart_service ssh
+    restart_service dropbear
+    restart_service fail2ban
+    restart_service vnstat
+    restart_service haproxy
+    restart_service cron
 
     systemctl daemon-reload
-    systemctl start netfilter-persistent
-    systemctl enable --now nginx
-    systemctl enable --now xray
-    systemctl enable --now rc-local
-    systemctl enable --now dropbear
-    systemctl enable --now openvpn
-    systemctl enable --now cron
-    systemctl enable --now haproxy
-    systemctl enable --now netfilter-persistent
-    systemctl enable --now ws
+    systemctl start netfilter-persistent 2>/dev/null || true
+    systemctl enable --now nginx 2>/dev/null || true
+    systemctl enable --now xray 2>/dev/null || true
+    systemctl enable --now rc-local 2>/dev/null || true
+    systemctl enable --now dropbear 2>/dev/null || true
+    systemctl enable --now openvpn 2>/dev/null || true
+    systemctl enable --now cron 2>/dev/null || true
+    systemctl enable --now haproxy 2>/dev/null || true
+    systemctl enable --now netfilter-persistent 2>/dev/null || true
+    systemctl enable --now ws 2>/dev/null || true
     systemctl enable --now fail2ban 2>/dev/null || true
 
     history -c
@@ -1002,14 +1107,14 @@ enable_services(){
     clear
     print_install "Enable services"
     systemctl daemon-reload
-    systemctl start netfilter-persistent
-    systemctl enable --now rc-local
-    systemctl enable --now cron
-    systemctl enable --now netfilter-persistent
-    systemctl restart nginx
-    systemctl restart xray
-    systemctl restart cron
-    systemctl restart haproxy
+    systemctl start netfilter-persistent 2>/dev/null || true
+    systemctl enable --now rc-local 2>/dev/null || true
+    systemctl enable --now cron 2>/dev/null || true
+    systemctl enable --now netfilter-persistent 2>/dev/null || true
+    systemctl restart nginx 2>/dev/null || true
+    systemctl restart xray 2>/dev/null || true
+    systemctl restart cron 2>/dev/null || true
+    systemctl restart haproxy 2>/dev/null || true
     print_success "Services enabled"
     clear
 }
