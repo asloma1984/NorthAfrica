@@ -63,7 +63,7 @@ ensure_early_dependencies() {
   apt-get update -y >/dev/null 2>&1 || true
   apt-get install -y \
     curl wget ca-certificates iproute2 dnsutils net-tools \
-    lsb-release gnupg gnupg2 >/dev/null 2>&1 || true
+    lsb-release gnupg gnupg2 unzip >/dev/null 2>&1 || true
 }
 
 detect_os() {
@@ -801,7 +801,8 @@ ins_SSHD(){
     fi
 
     systemctl restart ssh
-    /etc/init.d/ssh status || true
+    systemctl enable --now ssh 2>/dev/null || true   # ensure SSH is enabled at boot
+    /etc/init.d/ssh status 2>/dev/null || true
     print_success "SSHD"
 }
 
@@ -931,6 +932,7 @@ ins_epro(){
     chmod +x /usr/bin/ws
     chmod 644 /usr/bin/tun.conf
 
+    systemctl unmask ws 2>/dev/null || true
     systemctl disable ws 2>/dev/null || true
     systemctl stop ws 2>/dev/null || true
     systemctl enable ws
@@ -989,6 +991,7 @@ ins_restart(){
     systemctl enable --now netfilter-persistent 2>/dev/null || true
     systemctl enable --now ws 2>/dev/null || true
     systemctl enable --now fail2ban 2>/dev/null || true
+    systemctl enable --now ssh 2>/dev/null || true   # make sure SSH stays enabled
 
     history -c
     echo "unset HISTFILE" >> /etc/profile
@@ -1115,6 +1118,7 @@ enable_services(){
     systemctl restart xray 2>/dev/null || true
     systemctl restart cron 2>/dev/null || true
     systemctl restart haproxy 2>/dev/null || true
+    systemctl enable --now ssh 2>/dev/null || true   # ensure ssh enabled here as well
     print_success "Services enabled"
     clear
 }
