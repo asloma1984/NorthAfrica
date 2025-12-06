@@ -1,27 +1,14 @@
 [Unit]
-Description=WebSocket Service
+Description=WebSocket
 Documentation=https://github.com/jaka1m
-After=network-online.target dropbear.service
-Wants=network-online.target
-
+After=syslog.target network-online.target
 [Service]
-Type=simple
 User=root
-
-# Wait for Dropbear on port 109 before starting
-ExecStartPre=/usr/bin/bash -c 'until ss -tulnp | grep -q ":109"; do sleep 1; done'
-
-ExecStart=/usr/bin/ws -f /usr/bin/tun.conf
-
-Restart=always
-RestartSec=2
-
-LimitNOFILE=1000000
-LimitNPROC=1000000
 NoNewPrivileges=true
-
-# Protect WS from menu scripts that stop services
-RefuseManualStop=yes
-
+ExecStart=/usr/bin/ws -f /usr/bin/tun.conf
+Restart=on-failure
+RestartPreventExitStatus=23
+LimitNPROC=10000
+LimitNOFILE=1000000
 [Install]
 WantedBy=multi-user.target
