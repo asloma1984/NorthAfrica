@@ -692,7 +692,7 @@ make_folder_xray() {
     echo "echo -e 'Vps Config User Account'" >> /etc/user-create/user.log
 }
 
-# Install Xray core - FIXED FOR UBUNTU 24.04
+# Install Xray core - FIXED FOR MULTI DISTRO
 install_xray() {
     clear
     print_install "Install Xray Core (latest)"
@@ -709,6 +709,11 @@ install_xray() {
         safe_download "${REPO}config/xray/config.json" /etc/xray/config.json
     fi
 
+    # Ensure Xray config is available in both paths:
+    # /etc/xray/config.json and /usr/local/etc/xray/config.json
+    mkdir -p /usr/local/etc/xray
+    cp /etc/xray/config.json /usr/local/etc/xray/config.json 2>/dev/null || true
+
     safe_download "${REPO}files/runn.service" /etc/systemd/system/runn.service
     domain=$(cat /etc/xray/domain 2>/dev/null || echo "localhost")
     print_success "Xray Core installed"
@@ -722,6 +727,14 @@ install_xray() {
     sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     safe_curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
+
+    # Force nginx to always use /etc/xray/xray.{crt,key} instead of /etc/letsencrypt/...
+    if [[ -f /etc/xray/xray.crt && -f /etc/xray/xray.key ]]; then
+        sed -i 's#/etc/letsencrypt/live/[^;"]*fullchain\.pem#/etc/xray/xray.crt#g' /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
+        sed -i 's#/etc/letsencrypt/live/[^;"]*privkey\.pem#/etc/xray/xray.key#g'   /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
+        sed -i 's#/etc/letsencrypt/live/[^;"]*cert\.pem#/etc/xray/xray.crt#g'      /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
+        sed -i 's#/etc/letsencrypt/live/[^;"]*chain\.pem#/etc/xray/xray.crt#g'     /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
+    fi
 
     # Fix HAProxy config
     if [[ -f /etc/haproxy/haproxy.cfg ]]; then
@@ -762,7 +775,7 @@ User=www-data
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
 NoNewPrivileges=true
-ExecStart=/usr/local/bin/xray run -config /etc/xray/config.json
+ExecStart=/usr/local/bin/xray run -config /usr/local/etc/xray/config.json
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -979,6 +992,7 @@ ins_dropbear(){
     chmod +x /etc/default/dropbear
     
     # Create systemd service if not exists
+    # NOTE: we avoid using port 22/443 here to prevent conflict with SSH/nginx
     if [[ ! -f /etc/systemd/system/dropbear.service ]]; then
         cat > /etc/systemd/system/dropbear.service << EOF
 [Unit]
@@ -987,7 +1001,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/dropbear -F -E -p 22 -p 443
+ExecStart=/usr/sbin/dropbear -F -E -p 109 -p 143
 Restart=always
 
 [Install]
@@ -1133,18 +1147,35 @@ ins_Fail2ban(){
     print_success "Fail2ban & banner"
 }
 
-# ePro WebSocket Proxy - FIXED FOR UBUNTU 24.04
+# ePro WebSocket Proxy - FIXED FOR UBUNTU/DEBIAN (NO 404, NO MASKED)
 ins_epro(){
     clear
     print_install "Install ePro WebSocket Proxy"
     
     safe_download "${REPO}files/ws" /usr/bin/ws
     safe_download "${REPO}config/tun.conf" /usr/bin/tun.conf
-    safe_download "${REPO}files/ws.service" /etc/systemd/system/ws.service
     
     chmod +x /usr/bin/ws
     chmod 644 /usr/bin/tun.conf
-    chmod +x /etc/systemd/system/ws.service
+
+    # Create ws.service locally to avoid 404 and mask issues
+cat > /etc/systemd/system/ws.service << EOF
+[Unit]
+Description=WS-ePro WebSocket Proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ws -c /usr/bin/tun.conf
+Restart=always
+RestartSec=5
+LimitNOFILE=100000
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    chmod 644 /etc/systemd/system/ws.service
 
     systemctl daemon-reload
     systemctl unmask ws 2>/dev/null || true
