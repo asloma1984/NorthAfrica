@@ -114,22 +114,30 @@ EOF
 }
 
 # ===========================================
-# SAFE DOWNLOAD WITH RETRY - FIX DOWNLOAD ISSUES
+# SAFE DOWNLOAD WITH RETRY - IMPROVED (NO SPAM ON 404)
 # ===========================================
 safe_download() {
   local url="$1"
   local output="$2"
   local max_retries=5
   local retry_count=0
+  local http_code="000"
   
   while [ $retry_count -lt $max_retries ]; do
-    # quiet + hide wget native errors (no raw 404 on screen)
-    if wget -q --no-check-certificate --timeout=30 -O "$output" "$url" >/dev/null 2>&1; then
+    if wget -q --no-check-certificate --timeout=30 -O "$output" "$url"; then
       return 0
+    fi
+
+    # Check HTTP code (to detect 404/4xx and stop retrying)
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
+
+    if [[ "$http_code" == 4* ]]; then
+      echo -e "${ERROR} Remote file not found (HTTP $http_code): $url${NC}"
+      return 1
     fi
     
     retry_count=$((retry_count + 1))
-    echo -e "${YELLOW}[*] Download failed, retry $retry_count/$max_retries...${NC}"
+    echo -e "${YELLOW}[*] Download failed (HTTP $http_code), retry $retry_count/$max_retries...${NC}"
     sleep 3
     
     # Fix DNS again if needed
@@ -138,7 +146,7 @@ safe_download() {
     fi
   done
   
-  echo -e "${ERROR} Failed to download: $url${NC}"
+  echo -e "${ERROR} Failed to download after $max_retries attempts: $url${NC}"
   return 1
 }
 
@@ -146,18 +154,25 @@ safe_curl() {
   local url="$1"
   local max_retries=5
   local retry_count=0
+  local http_code="000"
   
   while [ $retry_count -lt $max_retries ]; do
-    # -sSL is already quiet; add 2>/dev/null to hide curl native errors
-    if curl -sSL --connect-timeout 20 --retry 3 "$url" 2>/dev/null; then
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
+    
+    if [[ "$http_code" == "200" ]]; then
+      curl -sSL "$url"
       return 0
+    fi
+
+    if [[ "$http_code" == 4* ]]; then
+      echo -e "${ERROR} Remote resource not found (HTTP $http_code): $url${NC}"
+      return 1
     fi
     
     retry_count=$((retry_count + 1))
-    echo -e "${YELLOW}[*] Curl failed, retry $retry_count/$max_retries...${NC}"
+    echo -e "${YELLOW}[*] Curl failed (HTTP $http_code), retry $retry_count/$max_retries...${NC}"
     sleep 3
     
-    # Fix DNS again if needed
     if ! ping -c1 -W2 google.com &>/dev/null; then
       fix_dns
     fi
@@ -455,7 +470,7 @@ first_setup(){
         }
     elif [[ $OS_ID == "debian" ]]; then
         apt-get install -y haproxy 2>/dev/null || {
-            curl -s https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg 2>/dev/null
+            curl https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg 2>/dev/null
             echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
                 http://haproxy.debian.net bookworm-backports-2.8 main \
                 >/etc/apt/sources.list.d/haproxy.list 2>/dev/null
@@ -620,7 +635,7 @@ restart_system(){
     # curl -s --max-time 10 -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" "$URL" >/dev/null || true
 }
 
-# Install SSL - FIXED FOR UBUNTU 24.04 + COMPATIBLE PATHS
+# Install SSL - FIXED FOR UBUNTU 24.04
 pasang_ssl() {
     clear
     print_install "Installing SSL Certificate"
@@ -667,14 +682,6 @@ pasang_ssl() {
     chmod 600 /etc/xray/xray.key
     chmod 644 /etc/xray/xray.crt
 
-    # Also provide Let’s Encrypt-style path for any legacy nginx configs
-    LE_DIR="/etc/letsencrypt/live/$domain"
-    mkdir -p "$LE_DIR"
-    cp /etc/xray/xray.crt "$LE_DIR/fullchain.pem"
-    cp /etc/xray/xray.key "$LE_DIR/privkey.pem"
-    chmod 600 "$LE_DIR/privkey.pem"
-    chmod 644 "$LE_DIR/fullchain.pem"
-
     print_success "SSL Certificate successfully installed"
 }
 
@@ -702,7 +709,7 @@ make_folder_xray() {
     echo "echo -e 'Vps Config User Account'" >> /etc/user-create/user.log
 }
 
-# Install Xray core - FIXED FOR MULTI DISTRO
+# Install Xray core - FIXED PATH FOR CONFIG.JSON
 install_xray() {
     clear
     print_install "Install Xray Core (latest)"
@@ -714,15 +721,14 @@ install_xray() {
     chmod +x /tmp/install-xray.sh
     /tmp/install-xray.sh install -u www-data
 
-    # Try main config first (old path), then fallback to config/xray/config.json
-    if ! safe_download "${REPO}config/config.json" /etc/xray/config.json; then
-        safe_download "${REPO}config/xray/config.json" /etc/xray/config.json
+    # Correct path: config/xray/config.json
+    if ! safe_download "${REPO}config/xray/config.json" /etc/xray/config.json; then
+        # Fallback for old layout (if you ever add config/config.json)
+        safe_download "${REPO}config/config.json" /etc/xray/config.json || {
+          print_error "Xray config.json not found in repo"
+          exit 1
+        }
     fi
-
-    # Ensure Xray config is available in both paths:
-    # /etc/xray/config.json and /usr/local/etc/xray/config.json
-    mkdir -p /usr/local/etc/xray
-    cp /etc/xray/config.json /usr/local/etc/xray/config.json 2>/dev/null || true
 
     safe_download "${REPO}files/runn.service" /etc/systemd/system/runn.service
     domain=$(cat /etc/xray/domain 2>/dev/null || echo "localhost")
@@ -731,20 +737,13 @@ install_xray() {
     clear
     curl -s ipinfo.io/city >>/etc/xray/city 2>/dev/null || echo "Unknown" >>/etc/xray/city
     curl -s ipinfo.io/org | cut -d " " -f 2-10 >>/etc/xray/isp 2>/dev/null || echo "Unknown" >>/etc/xray/isp
+
     print_install "Install configuration packets"
     safe_download "${REPO}config/haproxy.cfg" /etc/haproxy/haproxy.cfg
     safe_download "${REPO}config/xray.conf" /etc/nginx/conf.d/xray.conf
     sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     safe_curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
-
-    # Force nginx to always use /etc/xray/xray.{crt,key} instead of /etc/letsencrypt/...
-    if [[ -f /etc/xray/xray.crt && -f /etc/xray/xray.key ]]; then
-        sed -i 's#/etc/letsencrypt/live/[^;"]*fullchain\.pem#/etc/xray/xray.crt#g' /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
-        sed -i 's#/etc/letsencrypt/live/[^;"]*privkey\.pem#/etc/xray/xray.key#g'   /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
-        sed -i 's#/etc/letsencrypt/live/[^;"]*cert\.pem#/etc/xray/xray.crt#g'      /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
-        sed -i 's#/etc/letsencrypt/live/[^;"]*chain\.pem#/etc/xray/xray.crt#g'     /etc/nginx/nginx.conf /etc/nginx/conf.d/xray.conf 2>/dev/null || true
-    fi
 
     # Fix HAProxy config
     if [[ -f /etc/haproxy/haproxy.cfg ]]; then
@@ -785,7 +784,7 @@ User=www-data
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
 NoNewPrivileges=true
-ExecStart=/usr/local/bin/xray run -config /usr/local/etc/xray/config.json
+ExecStart=/usr/local/bin/xray run -config /etc/xray/config.json
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -999,10 +998,9 @@ ins_dropbear(){
     }
     
     safe_download "${REPO}config/dropbear.conf" /etc/default/dropbear
-    chmod +x /etc/default/dropbear
+    chmod 644 /etc/default/dropbear
     
-    # Create systemd service if not exists
-    # NOTE: we avoid using port 22/443 here to prevent conflict with SSH/nginx
+    # Create systemd service if not exists (listen only on localhost for OHP)
     if [[ ! -f /etc/systemd/system/dropbear.service ]]; then
         cat > /etc/systemd/system/dropbear.service << EOF
 [Unit]
@@ -1011,7 +1009,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/dropbear -F -E -p 109 -p 143
+ExecStart=/usr/sbin/dropbear -F -E -p 127.0.0.1:109 -p 127.0.0.1:143
 Restart=always
 
 [Install]
@@ -1157,44 +1155,24 @@ ins_Fail2ban(){
     print_success "Fail2ban & banner"
 }
 
-# ePro WebSocket Proxy - FIXED FOR UBUNTU/DEBIAN (NO 404, NO MASKED)
+# ePro WebSocket Proxy
 ins_epro(){
     clear
     print_install "Install ePro WebSocket Proxy"
     
     safe_download "${REPO}files/ws" /usr/bin/ws
     safe_download "${REPO}config/tun.conf" /usr/bin/tun.conf
+    safe_download "${REPO}files/ws.service" /etc/systemd/system/ws.service
     
     chmod +x /usr/bin/ws
     chmod 644 /usr/bin/tun.conf
-
-    # Create ws.service locally to avoid 404 and mask issues
-cat > /etc/systemd/system/ws.service << EOF
-[Unit]
-Description=WS-ePro WebSocket Proxy
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/ws -f /usr/bin/tun.conf
-Restart=always
-RestartSec=5
-LimitNOFILE=100000
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    chmod 644 /etc/systemd/system/ws.service
+    chmod +x /etc/systemd/system/ws.service
 
     systemctl daemon-reload
     systemctl unmask ws 2>/dev/null || true
     systemctl enable ws
     systemctl start ws
     systemctl restart ws
-
-    # Ensure Xray share dir exists
-    mkdir -p /usr/local/share/xray
 
     safe_download "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" /usr/local/share/xray/geosite.dat
     safe_download "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" /usr/local/share/xray/geoip.dat
