@@ -9,6 +9,11 @@
 # All rights reserved to asloma1984 (GitHub)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# License check – stop install if VPS is not registered
+if ! /usr/local/bin/license_check; then
+    exit 1
+fi
+
 Green="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
