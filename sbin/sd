@@ -1,0 +1,102 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DF='\e[39m'
+Bold='\e[1m'
+yell='\e[33m'
+red='\e[31m'
+green='\e[32m'
+blue='\e[34m'
+cyan='\e[36m'
+NC='\e[0m'
+GREEN='\033[0;32m'
+
+# BOT
+CHATID=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 3)
+KEY=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 2)
+URL="https://api.telegram.org/bot$KEY/sendMessage"
+TIME="10"
+
+clear
+echo -e "${cyan}────────────────────────────────────────────${NC}"
+read -p " Username      : " Login
+read -p " Password      : " Pass
+read -p " Expired (Days): " masaaktif
+echo -e "${cyan}────────────────────────────────────────────${NC}"
+
+# IP Server
+IP=$(curl -sS ifconfig.me)
+
+# Domain
+domen=$(cat /etc/xray/domain 2>/dev/null)
+
+# READ HOST NS
+if [[ -f /etc/slowdns/ns ]]; then
+    NS=$(tr -d '\n' < /etc/slowdns/ns)
+else
+    NS="(NS host not found)"
+fi
+
+# READ PUBLIC KEY
+if [[ -f /etc/slowdns/server.pub ]]; then
+    PUB=$(tr -d '\n' < /etc/slowdns/server.pub)
+else
+    PUB="(Public key not found)"
+fi
+
+# Dates
+tgl=$(date -d "$masaaktif days" +"%d %b, %Y")
+tnggl=$(date +"%d %b, %Y")
+
+# Create system user
+useradd -e $(date -d "$masaaktif days" +"%Y-%m-%d") -s /bin/false -M $Login
+echo -e "$Pass\n$Pass\n" | passwd $Login &>/dev/null
+
+# TELEGRAM message
+TEXT="<code>────────────────────────</code>
+<code>      SlowDNS Premium     </code>
+<code>────────────────────────</code>
+<code>IP Server    = $IP</code>
+<code>Host SlowDNS = $NS</code>
+<code>Pub Key      = $PUB</code>
+<code>Username     = $Login</code>
+<code>Password     = $Pass</code>
+<code>────────────────────────</code>
+Active during : $masaaktif Days
+Created on    : $tnggl
+Ends on       : $tgl
+<code>────────────────────────</code>"
+
+curl -s --max-time $TIME \
+ -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" \
+ $URL >/dev/null
+
+clear
+
+line="────────────────────────────────────────────────────────────"
+
+echo -e "${cyan}${line}${NC}"
+echo -e "                ${cyan}SLOWDNS PREMIUM DETAILS${NC}"
+echo -e "${cyan}${line}${NC}"
+
+printf " ${cyan}%-15s${NC}: %s\n" "IP Server"      "$IP"
+printf " ${cyan}%-15s${NC}: %s\n" "Host Slowdns"   "$NS"
+printf " ${cyan}%-15s${NC}: %s\n" "Pub Key"        "$PUB"
+printf " ${cyan}%-15s${NC}: %s\n" "Username"       "$Login"
+printf " ${cyan}%-15s${NC}: %s\n" "Password"       "$Pass"
+
+echo -e "${cyan}${line}${NC}"
+
+printf " ${cyan}%-15s${NC}: %s Days\n" "Active for"    "$masaaktif"
+printf " ${cyan}%-15s${NC}: %s\n" "Created on"     "$tnggl"
+printf " ${cyan}%-15s${NC}: %s\n" "Expires on"     "$tgl"
+
+echo -e "${cyan}${line}${NC}"
+echo ""
+read -n 1 -s -r -p "Press any key to return to menu..."
+menu

@@ -1,0 +1,189 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script
+
+CYAN="\033[1;36m"
+WHITE="\033[1;37m"
+YELLOW="\033[33m"
+RED="\033[31m"
+GREEN="\033[0;32m"
+NC="\033[0m"
+
+# Telegram Bot
+CHATID=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 3)
+KEY=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 2)
+URL="https://api.telegram.org/bot$KEY/sendMessage"
+TIME="10"
+
+checking_sc() { return 0; }
+checking_sc
+
+clear
+echo -e "${GREEN}Loading...${NC}"
+sleep 1
+clear
+
+source /var/lib/kyt/ipvps.conf
+domain=${IP:-$(cat /etc/xray/domain)}
+
+# ==============================
+#   CREATE VMESS ACCOUNT HEADER
+# ==============================
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}          CREATE VMESS ACCOUNT        ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# ==============================
+#   USERNAME INPUT
+# ==============================
+while true; do
+    read -rp "Username : " user
+    CLIENT_EXISTS=$(grep -w "$user" /etc/xray/config.json | wc -l)
+
+    if [[ "$CLIENT_EXISTS" == "0" && "$user" =~ ^[a-zA-Z0-9_]+$ ]]; then
+        break
+    fi
+
+    echo -e "${RED}User already exists or invalid.${NC}"
+    read -n1 -s -r -p "Press any key to return..."
+    m-vmess
+done
+
+uuid=$(cat /proc/sys/kernel/random/uuid)
+
+read -rp "Expired (days) : " masaaktif
+read -rp "Limit User (GB): " Quota
+read -rp "Limit User (IP): " iplimit
+
+exp=$(date -d "$masaaktif days" +"%Y-%m-%d")
+exp_human=$(date -d "$masaaktif days" +"%d %b %Y")
+
+# ==============================
+#   INSERT CONFIG INTO XRAY
+# ==============================
+sed -i '/#vmess$/a\### '"$user $exp"'\
+},{"id": "'"$uuid"'","alterId": 0,"email": "'"$user"'"' /etc/xray/config.json
+
+sed -i '/#vmessgrpc$/a\### '"$user $exp"'\
+},{"id": "'"$uuid"'","alterId": 0,"email": "'"$user"'"' /etc/xray/config.json
+
+# ==============================
+#   VMESS JSON PAYLOADS
+# ==============================
+ws_tls=$(cat <<EOF
+{
+"v": "2",
+"ps": "$user",
+"add": "$domain",
+"port": "443",
+"id": "$uuid",
+"aid": "0",
+"net": "ws",
+"path": "/vmess",
+"tls": "tls",
+"host": "$domain"
+}
+EOF
+)
+
+ws_ntls=$(cat <<EOF
+{
+"v": "2",
+"ps": "$user",
+"add": "$domain",
+"port": "80",
+"id": "$uuid",
+"aid": "0",
+"net": "ws",
+"path": "/vmess",
+"tls": "none",
+"host": "$domain"
+}
+EOF
+)
+
+grpc=$(cat <<EOF
+{
+"v": "2",
+"ps": "$user",
+"add": "$domain",
+"port": "443",
+"id": "$uuid",
+"aid": "0",
+"net": "grpc",
+"path": "vmess-grpc",
+"tls": "tls",
+"host": "$domain"
+}
+EOF
+)
+
+vmesslink1="vmess://$(echo $ws_tls | base64 -w 0)"
+vmesslink2="vmess://$(echo $ws_ntls | base64 -w 0)"
+vmesslink3="vmess://$(echo $grpc | base64 -w 0)"
+
+systemctl restart xray > /dev/null
+
+# ==============================
+#   SAVE QUOTA & LIMITS
+# ==============================
+mkdir -p /etc/vmess
+bytes=$((Quota * 1024 * 1024 * 1024))
+echo "$bytes" > /etc/vmess/$user
+
+mkdir -p /etc/kyt/limit/vmess/ip
+echo "$iplimit" > /etc/kyt/limit/vmess/ip/$user
+
+sed -i "/\b$user\b/d" /etc/vmess/.vmess.db
+echo "### $user $exp $uuid $Quota $iplimit" >> /etc/vmess/.vmess.db
+
+# ==============================
+#   TELEGRAM MESSAGE
+# ==============================
+TEXT="
+<code>━━━━━━━━━━━━━━━━━━━━━━━</code>
+<code>VMESS ACCOUNT CREATED</code>
+<code>━━━━━━━━━━━━━━━━━━━━━━━</code>
+<code>User : $user</code>
+<code>Domain : $domain</code>
+<code>Quota : $Quota GB</code>
+<code>IP Limit : $iplimit</code>
+<code>TLS : $vmesslink1</code>
+<code>NON-TLS : $vmesslink2</code>
+<code>gRPC : $vmesslink3</code>
+"
+
+curl -s --max-time $TIME -d "chat_id=$CHATID&text=$TEXT&parse_mode=html" $URL >/dev/null
+
+# ==============================
+#   OUTPUT
+# ==============================
+clear
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}         VMESS ACCOUNT CREATED        ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}USERNAME${NC} : $user"
+echo -e "${YELLOW}DOMAIN${NC}   : $domain"
+echo -e "${YELLOW}UUID${NC}     : $uuid"
+echo -e "${YELLOW}EXPIRE${NC}   : $exp_human"
+echo -e "${YELLOW}QUOTA${NC}    : $Quota GB"
+echo -e "${YELLOW}IP LIMIT${NC} : $iplimit"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo "TLS Link:"
+echo "$vmesslink1"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo "NON TLS Link:"
+echo "$vmesslink2"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo "gRPC Link:"
+echo "$vmesslink3"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+read -n1 -s -r -p "Press any key to return..."
+m-vmess

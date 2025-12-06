@@ -1,0 +1,102 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Trial SSH / OVPN – NorthAfrica Script
+# Developer  : Abdul
+# Channel    : https://t.me/northafrica9
+# Group      : https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RED='\033[0;31m'
+NC='\033[0m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+
+clear
+echo -e "${GREEN}Loading...${NC}"
+sleep 1
+clear
+
+# SYSTEM DATA
+IP=$(curl -sS ipv4.icanhazip.com)
+CITY=$(head -n 1 /etc/xray/city)
+ISP=$(head -n 1 /etc/xray/isp)
+domain=$(cat /etc/xray/domain)
+WEBPORT=81
+
+# SlowDNS
+SLOWDNS_NS=$( [[ -f /etc/slowdns/ns ]] && cat /etc/slowdns/ns || echo "Not Installed" )
+DNSTT_PUB=$( [[ -f /etc/slowdns/server.pub ]] && cat /etc/slowdns/server.pub || echo "Not Installed" )
+
+# GENERATE TRIAL USER
+RAN=$(tr -dc 'A-Z0-9' < /dev/urandom | head -c4)
+Login="Trial-$RAN"
+Pass=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c6)
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}        CREATE TRIAL SSH / OVPN        ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+read -rp "  Active Time (Hours 1–24): " hours
+
+if [[ $hours -lt 1 || $hours -gt 24 ]]; then
+    echo -e "${RED}Invalid time! Use 1–24 hours.${NC}"
+    exit 1
+fi
+
+exp_date=$(date -d "$hours hour" +"%Y-%m-%d %H:%M")
+
+# CREATE USER
+useradd -e $(date -d "$hours hour" +"%Y-%m-%d") -s /bin/false -M $Login
+echo -e "$Pass\n$Pass\n" | passwd $Login >/dev/null 2>&1
+
+# AUTO DELETE IN X HOURS
+echo "userdel -f $Login" | at now + $hours hour >/dev/null 2>&1
+
+# DISPLAY RESULT
+clear
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}        TRIAL SSH / OVPN ACCOUNT CREATED ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Username         : $Login"
+echo -e "Password         : $Pass"
+echo -e "IP Address       : $IP"
+echo -e "Domain           : $domain"
+echo -e "City             : $CITY"
+echo -e "ISP              : $ISP"
+echo -e "Valid For        : $hours Hour(s)"
+echo -e "Expires On       : $exp_date"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "OpenSSH Ports    : 22, 80, 443"
+echo -e "Dropbear Ports   : 109, 443"
+echo -e "SSH UDP          : 1–65535"
+echo -e "SSH WS Ports     : 80, 8080, 2082"
+echo -e "SSH SSL WS       : 443"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "SlowDNS NS       : $SLOWDNS_NS"
+echo -e "SlowDNS PUB      : $DNSTT_PUB"
+echo -e "SlowDNS Ports    : 53 / 5300"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "OPENVPN LINKS:"
+echo -e "TCP     : http://$domain:$WEBPORT/tcp.ovpn"
+echo -e "UDP     : http://$domain:$WEBPORT/udp.ovpn"
+echo -e "SSL     : http://$domain:$WEBPORT/ssl.ovpn"
+echo -e "WS-SSL  : http://$domain:$WEBPORT/ws-ssl.ovpn"
+echo -e "ALL CFG : http://$domain:$WEBPORT/Kyt-Project.zip"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "PAYLOAD WS : GET / HTTP/1.1[crlf]Host: $domain[crlf]Upgrade: websocket[crlf][crlf]"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "PAYLOAD WSS: GET wss://BUG/ HTTP/1.1[crlf]Host: $domain[crlf]Upgrade: websocket[crlf][crlf]"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Channel : https://t.me/northafrica9"
+echo -e "Group   : https://t.me/groupnorthafrica"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# RETURN TO TRIAL MENU
+echo ""
+read -n 1 -s -r -p "Press any key to return..."
+m-trial

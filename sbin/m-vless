@@ -1,0 +1,72 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script – VLESS MENU
+
+# Colors (same as m-vmess)
+RED="\033[31m"
+GREEN="\033[0;32m"
+YELLOW="\033[33m"
+CYAN="\033[1;36m"
+WHITE="\033[1;37m"
+NC="\033[0m"
+BGWHITE="\033[0;100;37m"
+
+# Disable banned check
+checking_sc() { return 0; }
+checking_sc
+clear
+
+# HEADER
+echo -e ""
+echo -e " ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "      ${BGWHITE}${BLACK}             VLESS ACCOUNT MANAGER            ${NC}"
+echo -e " ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e ""
+
+# MENU
+echo -e " ${WHITE}[${GREEN}01${WHITE}]${YELLOW}  Create VLESS WS / gRPC Account${NC}"
+echo -e " ${WHITE}[${GREEN}02${WHITE}]${YELLOW}  Create Trial VLESS WS / gRPC${NC}"
+echo -e " ${WHITE}[${GREEN}03${WHITE}]${YELLOW}  Delete VLESS WS / gRPC Account${NC}"
+echo -e " ${WHITE}[${GREEN}04${WHITE}]${YELLOW}  Renew VLESS Account${NC}"
+echo -e " ${WHITE}[${GREEN}05${WHITE}]${YELLOW}  Check VLESS Login${NC}"
+echo -e " ${WHITE}[${RED}0X${WHITE}]${RED}  Back to Main Menu${NC}"
+echo -e ""
+echo -e " ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e ""
+
+read -rp " Select Option [ 1-5 / 0X ] » " menu
+
+case $menu in
+1 | 01)
+    clear
+    addvless
+    ;;
+2 | 02)
+    clear
+    trialvless
+    ;;
+3 | 03)
+    clear
+    delvless
+    ;;
+4 | 04)
+    clear
+    renewvless
+    ;;
+5 | 05)
+    clear
+    cekvless
+    ;;
+0 | 00 | x | X | 0x | 0X)
+    clear
+    menu
+    ;;
+*)
+    m-vless
+    ;;
+esac

@@ -1,0 +1,124 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script - Create SHADOWSOCKS WS/GRPC
+
+RED="\033[31m"
+YELLOW="\033[33m"
+NC="\033[0m"
+GREEN="\033[0;32m"
+BGWHITE="\033[0;100;37m"
+cyan="\033[1;36m"
+nc="\033[0m"
+
+# Telegram Bot Info
+CHATID=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 3)
+KEY=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 2)
+export TIME="10"
+export URL="https://api.telegram.org/bot$KEY/sendMessage"
+MYIP=$(curl -sS ipv4.icanhazip.com)
+
+clear
+
+checking_sc() { return 0; }
+checking_sc
+clear
+
+# Load Domain
+source /var/lib/kyt/ipvps.conf 2>/dev/null
+if [[ -z "$IP" ]]; then
+    domain=$(cat /etc/xray/domain)
+else
+    domain="$IP"
+fi
+
+# Create Username
+until [[ $user =~ ^[a-zA-Z0-9_]+$ && ${CLIENT_EXISTS} == '0' ]]; do
+  echo -e " ${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${nc}"
+  echo -e " ${BGWHITE}        Create SHADOWSOCKS Account       ${NC}"
+  echo -e " ${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${nc}"
+  read -rp " Username : " -e user
+  CLIENT_EXISTS=$(grep -w "$user" /etc/xray/config.json | wc -l)
+
+  if [[ ${CLIENT_EXISTS} == "1" ]]; then
+      clear
+      echo -e "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${nc}"
+      echo -e " Username already exists. Choose another."
+      echo -e "${cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${nc}"
+      read -n1 -s -r -p " Press any key to return..."
+      menu
+  fi
+done
+
+cipher="aes-128-gcm"
+uuid=$(cat /proc/sys/kernel/random/uuid)
+
+read -p " Expiration (days): " masaaktif
+read -p " User Limit (GB): " Quota
+
+exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+log_exp=$(date -d "$masaaktif days" +"%d %b %Y")
+created_on=$(date +"%d %b %Y")
+
+# ---------------------------------------------------
+# Insert SHADOWSOCKS WS & gRPC into XRAY config
+# ---------------------------------------------------
+
+# ---- WS ----
+sed -i '/#ssws$/a\#ss# '"$user $exp_date"'\
+      ,{"password": "'"$uuid"'","method": "'"$cipher"'","email": "'"$user"'" }' /etc/xray/config.json
+
+# ---- gRPC ----
+sed -i '/#ssgrpc$/a\#ss# '"$user $exp_date"'\
+      ,{"password": "'"$uuid"'","method": "'"$cipher"'","email": "'"$user"'" }' /etc/xray/config.json
+
+# Encode Link
+echo "$cipher:$uuid" > /tmp/log
+ss64=$(base64 -w 0 /tmp/log)
+
+sslink_ws_tls="ss://${ss64}@${domain}:443?path=/ss-ws&security=tls&type=ws#${user}"
+sslink_ws_ntls="ss://${ss64}@${domain}:80?path=/ss-ws&security=none&type=ws#${user}"
+sslink_grpc_tls="ss://${ss64}@${domain}:443?mode=gun&security=tls&type=grpc&serviceName=ss-grpc#${user}"
+
+rm -rf /tmp/log
+systemctl restart xray >/dev/null 2>&1
+
+# Save Quota
+mkdir -p /etc/shadowsocks
+bytes=$((Quota * 1024 * 1024 * 1024))
+echo "$bytes" >/etc/shadowsocks/${user}
+
+# Save DB
+sed -i "/\b${user}\b/d" /etc/shadowsocks/.shadowsocks.db 2>/dev/null
+echo "### ${user} ${exp_date} ${uuid}" >> /etc/shadowsocks/.shadowsocks.db
+
+# Show Output
+clear
+line="────────────────────────────────────────────────────────────"
+
+echo -e "${cyan}${line}${nc}"
+echo -e "                 ${cyan}SHADOWSOCKS ACCOUNT CREATED${nc}"
+echo -e "${cyan}${line}${nc}"
+
+printf " ${cyan}%-14s${nc}: %s\n" "Username" "$user"
+printf " ${cyan}%-14s${nc}: %s\n" "Domain" "$domain"
+printf " ${cyan}%-14s${nc}: %s GB\n" "Quota" "$Quota"
+printf " ${cyan}%-14s${nc}: %s\n" "Cipher" "$cipher"
+printf " ${cyan}%-14s${nc}: %s\n" "Password" "$uuid"
+printf " ${cyan}%-14s${nc}: %s\n" "Expired On" "$log_exp"
+printf " ${cyan}%-14s${nc}: %s\n" "Created On" "$created_on"
+
+echo -e "${cyan}${line}${nc}"
+echo -e " ${cyan}WS TLS Link ${nc}: ${sslink_ws_tls}"
+echo -e "${cyan}${line}${nc}"
+echo -e " ${cyan}WS No TLS  ${nc}: ${sslink_ws_ntls}"
+echo -e "${cyan}${line}${nc}"
+echo -e " ${cyan}gRPC TLS   ${nc}: ${sslink_grpc_tls}"
+echo -e "${cyan}${line}${nc}"
+
+read -n1 -s -r -p "Press any key to return to menu..."
+menu

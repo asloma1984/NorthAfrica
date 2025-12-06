@@ -1,0 +1,151 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# North Africa Script
+
+RED='\033[0;31m'
+NC='\033[0m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+
+# Getting Bot Config
+CHATID=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 3)
+KEY=$(grep -E "^#bot# " "/etc/bot/.bot.db" | cut -d ' ' -f 2)
+export TIME="10"
+export URL="https://api.telegram.org/bot$KEY/sendMessage"
+
+clear
+MYIP=$(curl -sS ipv4.icanhazip.com)
+echo -e "${GREEN}loading...${NC}"
+sleep 1
+clear
+
+checking_sc(){ return 0; }
+checking_sc
+clear
+
+domain=$(cat /etc/xray/domain)
+
+masaaktif=1
+Quota=1
+iplimit=10
+user=Trial-VM`</dev/urandom tr -dc 0-9 | head -c3`
+clear
+
+# HEADER
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}        SET EXPIRED IN MINUTES        ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+read -rp " Minutes : " pup
+clear
+
+uuid=$(cat /proc/sys/kernel/random/uuid)
+exp=$(date -d "$masaaktif days" +"%Y-%m-%d")
+
+# Insert VMESS Config
+sed -i '/#vmess$/a\### '"$user $exp"'\
+},{"id": "'"$uuid"'","alterId": 0,"email": "'"$user"'"' /etc/xray/config.json
+sed -i '/#vmessgrpc$/a\### '"$user $exp"'\
+"},{"id": "'"$uuid"'","alterId": 0,"email": "'"$user"'"' /etc/xray/config.json
+
+# VMESS LINKS
+asu=$(cat <<EOF
+{
+"v": "2",
+"ps": "$user",
+"add": "$domain",
+"port": "443",
+"id": "$uuid",
+"aid": "0",
+"net": "ws",
+"path": "/vmess",
+"tls": "tls",
+"host": "$domain"
+}
+EOF
+)
+
+ask=$(cat <<EOF
+{
+"v": "2",
+"ps": "$user",
+"add": "$domain",
+"port": "80",
+"id": "$uuid",
+"aid": "0",
+"net": "ws",
+"path": "/vmess",
+"tls": "none",
+"host": "$domain"
+}
+EOF
+)
+
+grpc=$(cat <<EOF
+{
+"v": "2",
+"ps": "$user",
+"add": "$domain",
+"port": "443",
+"id": "$uuid",
+"aid": "0",
+"net": "grpc",
+"path": "vmess-grpc",
+"tls": "tls",
+"host": "$domain"
+}
+EOF
+)
+
+vmess_tls="vmess://$(echo $asu | base64 -w 0)"
+vmess_ntls="vmess://$(echo $ask | base64 -w 0)"
+vmess_grpc="vmess://$(echo $grpc | base64 -w 0)"
+
+# Apply System
+systemctl restart xray >/dev/null 2>&1
+
+mkdir -p /etc/vmess
+bytes=$((Quota * 1024 * 1024 * 1024))
+echo "$bytes" >/etc/vmess/$user
+
+mkdir -p /etc/kyt/limit/vmess/ip
+echo "$iplimit" >/etc/kyt/limit/vmess/ip/$user
+
+sed -i "/\b$user\b/d" /etc/vmess/.vmess.db
+echo "### $user $exp $uuid $Quota $iplimit" >> /etc/vmess/.vmess.db
+
+echo "tunnel vmess $user" | at now +$pup minutes &>/dev/null
+
+# OUTPUT FORMAT
+clear
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}             TRIAL VMESS              ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}Remarks${NC}      : $user"
+echo -e "${GREEN}Domain${NC}       : $domain"
+echo -e "${GREEN}Quota${NC}        : $Quota GB"
+echo -e "${GREEN}TLS Ports${NC}    : 443, 8443"
+echo -e "${GREEN}NTLS Ports${NC}   : 80, 8080, 8880, 2082, 2022, 2092"
+echo -e "${GREEN}UUID${NC}         : $uuid"
+echo -e "${GREEN}Network${NC}      : ws / grpc"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "TLS Link :"
+echo "$vmess_tls"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "NTLS Link :"
+echo "$vmess_ntls"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "gRPC Link :"
+echo "$vmess_grpc"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Active For : $pup minutes"
+echo ""
+
+# RETURN TO TRIAL MENU (FIXED)
+read -n 1 -s -r -p "Press Any Key To Back On Menu"
+m-trial

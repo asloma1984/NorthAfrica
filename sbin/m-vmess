@@ -1,0 +1,68 @@
+#!/bin/bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CYAN="\033[1;36m"
+WHITE="\033[1;37m"
+YELLOW="\033[33m"
+RED="\033[31m"
+GREEN="\033[0;32m"
+NC="\033[0m"
+BGWHITE="\033[0;100;37m"
+
+checking_sc() { return 0; }
+checking_sc
+clear
+
+# HEADER
+echo -e ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${WHITE}                 VMESS MANAGER MENU               ${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+echo -e "${GREEN}  [01]${NC} ${WHITE}Create Vmess WS / GRPC Account${NC}"
+echo -e "${GREEN}  [02]${NC} ${WHITE}Create Trial Vmess Account${NC}"
+echo -e "${GREEN}  [03]${NC} ${WHITE}Delete Vmess Account${NC}"
+echo -e "${GREEN}  [04]${NC} ${WHITE}Renew Vmess Account${NC}"
+echo -e "${GREEN}  [05]${NC} ${WHITE}Check Vmess Login${NC}"
+echo -e "${RED}  [0X]${NC}  ${RED}Back to Main Menu${NC}"
+
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+read -p "Select an option [1-5 / 0X] : " menu
+
+case $menu in
+1 | 01)
+    clear
+    addws
+    ;;
+2 | 02)
+    clear
+    trialws
+    ;;
+3 | 03)
+    clear
+    delws
+    ;;
+4 | 04)
+    clear
+    renewws
+    ;;
+5 | 05)
+    clear
+    cekws
+    ;;
+0 | 00 | x | X | 0x | 0X)
+    clear
+    menu
+    ;;
+*)
+    clear
+    m-vmess
+    ;;
+esac
