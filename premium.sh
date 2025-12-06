@@ -123,7 +123,8 @@ safe_download() {
   local retry_count=0
   
   while [ $retry_count -lt $max_retries ]; do
-    if wget --no-check-certificate --timeout=30 -O "$output" "$url"; then
+    # quiet + hide wget native errors (no raw 404 on screen)
+    if wget -q --no-check-certificate --timeout=30 -O "$output" "$url" >/dev/null 2>&1; then
       return 0
     fi
     
@@ -147,7 +148,8 @@ safe_curl() {
   local retry_count=0
   
   while [ $retry_count -lt $max_retries ]; do
-    if curl -sSL --connect-timeout 20 --retry 3 "$url"; then
+    # -sSL is already quiet; add 2>/dev/null to hide curl native errors
+    if curl -sSL --connect-timeout 20 --retry 3 "$url" 2>/dev/null; then
       return 0
     fi
     
@@ -453,7 +455,7 @@ first_setup(){
         }
     elif [[ $OS_ID == "debian" ]]; then
         apt-get install -y haproxy 2>/dev/null || {
-            curl https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg 2>/dev/null
+            curl -s https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg 2>/dev/null
             echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
                 http://haproxy.debian.net bookworm-backports-2.8 main \
                 >/etc/apt/sources.list.d/haproxy.list 2>/dev/null
@@ -618,7 +620,7 @@ restart_system(){
     # curl -s --max-time 10 -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" "$URL" >/dev/null || true
 }
 
-# Install SSL - FIXED FOR UBUNTU 24.04
+# Install SSL - FIXED FOR UBUNTU 24.04 + COMPATIBLE PATHS
 pasang_ssl() {
     clear
     print_install "Installing SSL Certificate"
@@ -664,6 +666,14 @@ pasang_ssl() {
 
     chmod 600 /etc/xray/xray.key
     chmod 644 /etc/xray/xray.crt
+
+    # Also provide Let’s Encrypt-style path for any legacy nginx configs
+    LE_DIR="/etc/letsencrypt/live/$domain"
+    mkdir -p "$LE_DIR"
+    cp /etc/xray/xray.crt "$LE_DIR/fullchain.pem"
+    cp /etc/xray/xray.key "$LE_DIR/privkey.pem"
+    chmod 600 "$LE_DIR/privkey.pem"
+    chmod 644 "$LE_DIR/fullchain.pem"
 
     print_success "SSL Certificate successfully installed"
 }
@@ -1166,7 +1176,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/ws -c /usr/bin/tun.conf
+ExecStart=/usr/bin/ws -f /usr/bin/tun.conf
 Restart=always
 RestartSec=5
 LimitNOFILE=100000
@@ -1182,6 +1192,9 @@ EOF
     systemctl enable ws
     systemctl start ws
     systemctl restart ws
+
+    # Ensure Xray share dir exists
+    mkdir -p /usr/local/share/xray
 
     safe_download "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" /usr/local/share/xray/geosite.dat
     safe_download "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" /usr/local/share/xray/geoip.dat
