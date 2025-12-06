@@ -313,7 +313,7 @@ license_denied_expired() {
   local exp_date="$1"
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
   echo -e "\033[41;97m              404 NOT FOUND AUTOSCRIPT              \033[0m"
-  echo -e "\033{1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
   echo -e ""
   echo -e "          ${RED}PERMISSION DENIED!${NC}"
   echo -e "   Your license for VPS ${YELLOW}$MYIP${NC} has expired."
@@ -703,8 +703,12 @@ install_xray() {
     safe_download "https://github.com/XTLS/Xray-install/raw/main/install-release.sh" /tmp/install-xray.sh
     chmod +x /tmp/install-xray.sh
     /tmp/install-xray.sh install -u www-data
- 
-    safe_download "${REPO}config/config.json" /etc/xray/config.json
+
+    # Try main config first (old path), then fallback to config/xray/config.json
+    if ! safe_download "${REPO}config/config.json" /etc/xray/config.json; then
+        safe_download "${REPO}config/xray/config.json" /etc/xray/config.json
+    fi
+
     safe_download "${REPO}files/runn.service" /etc/systemd/system/runn.service
     domain=$(cat /etc/xray/domain 2>/dev/null || echo "localhost")
     print_success "Xray Core installed"
