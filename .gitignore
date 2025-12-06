@@ -1,7 +1,0 @@
-git-crypt-key
-*.key
-*.pem
-*.secret
-credentials.*
-.env
-config.local.*
