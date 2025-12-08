@@ -28,6 +28,9 @@ green='\e[0;32m'
 # ─────────────────────────────────────────────────────
 clean_and_exit() {
   echo ""
+  echo -e "${YELLOW}[*] Installer will exit in 3 seconds...${NC}"
+  sleep 3
+
   echo -e "${YELLOW}[*] Cleaning installer files before exit...${NC}"
 
   # Remove this script itself
@@ -712,7 +715,7 @@ pasang_ssl() {
         --ecc
 
     # Create certificate if acme.sh failed
-    if [[ ! -f /etc/xray/xray.crt ]]; then
+       if [[ ! -f /etc/xray/xray.crt ]]; then
         echo -e "${YELLOW}[*] ACME failed, generating self-signed certificate...${NC}"
         openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
             -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=$domain" \
@@ -1438,12 +1441,29 @@ instal(){
 
 # Run installation
 instal
+
 echo ""
+echo -e "${YELLOW}Setting up final process...${NC}"
+sleep 1
+
+# Simple progress 0% -> 100%
+for p in $(seq 0 5 100); do
+  printf "\rProgress: %3d%%" "$p"
+  sleep 0.2
+done
+echo ""
+echo ""
+
 history -c
 rm -rf /root/menu /root/*.zip /root/*.sh /root/LICENSE /root/README.md /root/domain 2>/dev/null || true
 secs_to_human "$(($(date +%s) - ${start}))"
-hostnamectl set-hostname "$USERNAME" 2>/dev/null || true
+
+# Force hostname to 'localhost' and ensure /etc/hosts is consistent
+hostnamectl set-hostname localhost 2>/dev/null || true
+HN=$(cat /etc/hostname 2>/dev/null || echo localhost)
+grep -q "127.0.1.1[[:space:]]*$HN" /etc/hosts 2>/dev/null || echo "127.0.1.1    $HN" >> /etc/hosts
+
 echo -e "${green} Installation finished! Now you can enjoy NorthAfrica Script.${NC}"
 echo ""
-read -p "$( echo -e "Press ${YELLOW}[ ${NC}${YELLOW}Enter${NC} ${YELLOW}]${NC} to reboot") " _
+read -p "Press [ Enter ] to reboot " _
 reboot
