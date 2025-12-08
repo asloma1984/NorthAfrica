@@ -804,15 +804,25 @@ install_xray() {
         echo "" >> /etc/haproxy/haproxy.cfg
     fi
     
-    # Create certificate if not exists
+    # Create certificate if not exists (for HAProxy + Xray)
+    mkdir -p /etc/haproxy/certs
+
     if [[ -f /etc/xray/xray.crt && -f /etc/xray/xray.key ]]; then
-        cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem >/dev/null
+        # Use existing certificate (from acme.sh or previous install)
+        cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/certs/combined.pem
     else
+        # Generate self-signed certificate as fallback
         openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
             -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=$domain" \
-            -keyout /etc/xray/xray.key -out /etc/xray/xray.crt
-        cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem >/dev/null
+            -keyout /etc/xray/xray.key \
+            -out /etc/xray/xray.crt
+
+        cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/certs/combined.pem
     fi
+
+    chmod 600 /etc/xray/xray.key
+    chmod 644 /etc/xray/xray.crt
+    chmod 600 /etc/haproxy/certs/combined.pem
     
     chmod +x /etc/systemd/system/runn.service
 
