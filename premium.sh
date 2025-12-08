@@ -24,6 +24,28 @@ red='\e[1;31m'
 green='\e[0;32m'
 
 # ─────────────────────────────────────────────────────
+# Cleanup helper: remove installer files and exit
+# ─────────────────────────────────────────────────────
+clean_and_exit() {
+  echo ""
+  echo -e "${YELLOW}[*] Cleaning installer files before exit...${NC}"
+
+  # Remove this script itself
+  rm -f "$0" 2>/dev/null
+
+  # Common script names in /root (adjust if needed)
+  rm -f /root/premium.sh /root/update.sh 2>/dev/null
+
+  # Temporary / downloaded content
+  rm -f /root/menu.zip 2>/dev/null
+  rm -rf /root/menu 2>/dev/null
+  rm -f /tmp/install-xray.sh /root/openvpn /root/bbr.sh /root/cf.sh 2>/dev/null
+
+  echo -e "${RED}Installer files removed. Exiting now.${NC}"
+  exit 1
+}
+
+# ─────────────────────────────────────────────────────
 # Core helpers: root, DNS, early deps, OS detection, services
 # ─────────────────────────────────────────────────────
 
@@ -277,7 +299,7 @@ clear && clear && clear
 
 # Banner
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "  Developer » Abdul (NorthAfrica Script) ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
+echo -e "  Developer » ${YELLOW}Abdul (NorthAfrica Script)${NC} ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
 echo -e "  » Auto install VPN & Xray server on your VPS"
 echo -e "  Channel : ${green}@northafrica9${NC}"
 echo -e "  Group   : ${green}@groupnorthafrica${NC}"
@@ -306,8 +328,16 @@ else
     echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
 
+# Ask client for subscriber name (as in register file)
+echo ""
+read -rp "Enter subscriber name (as registered) : " SUBSCRIBER_NAME
+if [[ -z "$SUBSCRIBER_NAME" ]]; then
+  echo -e "${ERROR} Subscriber name cannot be empty.${NC}"
+  clean_and_exit
+fi
+
 #-------------------------------------------------------------------------------
-#  LICENSE / REGISTER CHECK (PRIVATE)
+#  LICENSE / REGISTER CHECK (PRIVATE)  -  IP + NAME COMBINATION
 #-------------------------------------------------------------------------------
 MYIP=$(curl -sS ipv4.icanhazip.com 2>/dev/null || echo "")
 LICENSE_URL="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/register"
@@ -318,12 +348,15 @@ license_denied_not_registered() {
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
   echo -e ""
   echo -e "          ${RED}PERMISSION DENIED!${NC}"
-  echo -e "   Your VPS ${YELLOW}$MYIP${NC} is not registered."
+  echo -e "   VPS IP   : ${YELLOW}$MYIP${NC}"
+  echo -e "   Name     : ${YELLOW}$SUBSCRIBER_NAME${NC}"
+  echo -e ""
+  echo -e "   This IP + Name is NOT registered in license."
   echo -e "   Please contact the developer for activation:"
   echo -e ""
   echo -e "          Telegram: ${green}t.me/Abdulsalam403${NC}"
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-  exit 1
+  clean_and_exit
 }
 
 license_denied_expired() {
@@ -333,13 +366,16 @@ license_denied_expired() {
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
   echo -e ""
   echo -e "          ${RED}PERMISSION DENIED!${NC}"
-  echo -e "   Your license for VPS ${YELLOW}$MYIP${NC} has expired."
-  echo -e "   Expiration date : ${YELLOW}$exp_date${NC}"
+  echo -e "   VPS IP   : ${YELLOW}$MYIP${NC}"
+  echo -e "   Name     : ${YELLOW}$SUBSCRIBER_NAME${NC}"
+  echo -e "   Expired  : ${YELLOW}$exp_date${NC}"
+  echo -e ""
+  echo -e "   Your license has EXPIRED."
   echo -e "   Please contact the developer for renewal:"
   echo -e ""
   echo -e "          Telegram: ${green}t.me/Abdulsalam403${NC}"
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-  exit 1
+  clean_and_exit
 }
 
 license_check() {
@@ -349,12 +385,16 @@ license_check() {
   fix_dns
   
   data=$(safe_curl "$LICENSE_URL") || {
-    echo -e "${ERROR} Unable to fetch license data from register."
+    echo -e "${ERROR} Unable to fetch license data from register.${NC}"
     license_denied_not_registered
   }
 
-  # Assume last field is IP, field2 = username, field3 = expiry (YYYY-MM-DD)
-  line=$(echo "$data" | awk -v ip="$MYIP" '$NF==ip {print}')
+  # Register line format example:
+  # ### Abdul 2027-08-09 31.14.135.141
+  # Field2 = name, Field3 = expiry, last field = IP
+  line=$(echo "$data" \
+    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$NF==ip && $2==name {print}')
+
   if [[ -z "$line" ]]; then
     license_denied_not_registered
   fi
