@@ -709,13 +709,14 @@ pasang_ssl() {
 
     /root/.acme.sh/acme.sh --issue -d "$domain" --standalone -k ec-256 --force
 
-    ~/.acme.sh/acme.sh --installcert -d "$domain" \
+    # ~/.acme.sh/acme.sh --installcert -d "$domain" \   # OLD PATH (kept for reference, disabled)
+    /root/.acme.sh/acme.sh --installcert -d "$domain" \
         --fullchainpath /etc/xray/xray.crt \
         --keypath /etc/xray/xray.key \
         --ecc
 
     # Create certificate if acme.sh failed
-       if [[ ! -f /etc/xray/xray.crt ]]; then
+    if [[ ! -f /etc/xray/xray.crt ]]; then
         echo -e "${YELLOW}[*] ACME failed, generating self-signed certificate...${NC}"
         openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
             -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=$domain" \
@@ -810,6 +811,8 @@ install_xray() {
     if [[ -f /etc/xray/xray.crt && -f /etc/xray/xray.key ]]; then
         # Use existing certificate (from acme.sh or previous install)
         cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/certs/combined.pem
+        # Also create /etc/haproxy/hap.pem for configs that expect this path
+        cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/hap.pem
     else
         # Generate self-signed certificate as fallback
         openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
@@ -818,11 +821,14 @@ install_xray() {
             -out /etc/xray/xray.crt
 
         cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/certs/combined.pem
+        # Also create /etc/haproxy/hap.pem for configs that expect this path
+        cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/hap.pem
     fi
 
     chmod 600 /etc/xray/xray.key
     chmod 644 /etc/xray/xray.crt
     chmod 600 /etc/haproxy/certs/combined.pem
+    chmod 600 /etc/haproxy/hap.pem
     
     chmod +x /etc/systemd/system/runn.service
 
