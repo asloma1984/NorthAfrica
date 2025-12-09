@@ -14,7 +14,7 @@
 
 ⚙️ UPGRADE SYSTEM
 
-🔵 For Debian
+🔵 For Debian (9 – 13)
 
 apt update -y && apt upgrade -y && apt dist-upgrade -y && reboot
 
