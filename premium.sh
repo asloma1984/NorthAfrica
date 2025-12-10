@@ -261,6 +261,25 @@ detect_os() {
   fi
 }
 
+# Ensure /etc/sysctl.conf exists and has net.ipv4.ip_forward=1
+# This fixes "sed: can't read /etc/sysctl.conf" from OpenVPN helper scripts.
+ensure_sysctl_conf() {
+  if [[ ! -f /etc/sysctl.conf ]]; then
+    cat > /etc/sysctl.conf <<EOF
+# Sysctl configuration created by NorthAfrica installer
+net.ipv4.ip_forward=1
+EOF
+  else
+    if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
+      sed -i 's/^net.ipv4.ip_forward=.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+    else
+      echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+    fi
+  fi
+
+  sysctl -p /etc/sysctl.conf >/dev/null 2>&1 || true
+}
+
 restart_service() {
   local svc="$1"
   echo -e "${YELLOW}[*] Restarting service: $svc${NC}"
@@ -525,6 +544,9 @@ first_setup(){
     }
   fi
 
+  # Make sure sysctl.conf exists before any script touches it
+  ensure_sysctl_conf
+
   print_success "HAProxy installed and base environment prepared"
 }
 
@@ -577,6 +599,9 @@ base_package() {
     libc6 util-linux ca-certificates bsd-mailx \
     net-tools openssl gnupg gnupg2 lsb-release shc cmake git screen \
     xz-utils apt-transport-https dnsutils jq openvpn easy-rsa 2>/dev/null || true
+
+  # Ensure sysctl.conf is present & correct before OpenVPN helpers touch it
+  ensure_sysctl_conf
 
   print_success "Required packages installed"
 }
@@ -748,7 +773,7 @@ make_folder_xray() {
   echo "echo -e 'Vps Config User Account'" >> /etc/user-create/user.log
 }
 
-# Install Xray core - FIXED PATH FOR CONFIG.JSON
+# Install Xray core - USES config/config.json ONLY
 install_xray() {
   clear
   print_install "Install Xray Core (latest)"
@@ -761,13 +786,10 @@ install_xray() {
   chmod +x /tmp/install-xray.sh
   /tmp/install-xray.sh install -u www-data
 
-  # Correct path: config/xray/config.json
-  if ! safe_download "${REPO}config/xray/config.json" /etc/xray/config.json; then
-    # Fallback for old layout (if you ever add config/config.json)
-    safe_download "${REPO}config/config.json" /etc/xray/config.json || {
-      print_error "Xray config.json not found in repo"
-      exit 1
-    }
+  # Download Xray config from repo (config/config.json)
+  if ! safe_download "${REPO}config/config.json" /etc/xray/config.json; then
+    print_error "Xray config.json not found in repo (config/config.json)"
+    exit 1
   fi
 
   # runn.service moved to config/services
@@ -807,11 +829,11 @@ install_xray() {
   fi
 
   # Create certificate if not exists (for HAProxy + Xray)
-  mkdir -p /etc/haproxy/certs
+  mkdir -p /etc/haproxy
 
   if [[ -f /etc/xray/xray.crt && -f /etc/xray/xray.key ]]; then
     # Use existing certificate (from acme.sh or previous install)
-    cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/certs/combined.pem
+    cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/hap.pem
   else
     # Generate self-signed certificate as fallback
     openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
@@ -819,12 +841,12 @@ install_xray() {
       -keyout /etc/xray/xray.key \
       -out /etc/xray/xray.crt
 
-    cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/certs/combined.pem
+    cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/hap.pem
   fi
 
   chmod 600 /etc/xray/xray.key
   chmod 644 /etc/xray/xray.crt
-  chmod 600 /etc/haproxy/certs/combined.pem
+  chmod 600 /etc/haproxy/hap.pem
 
   chmod +x /etc/systemd/system/runn.service
 
