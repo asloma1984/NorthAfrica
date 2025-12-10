@@ -362,7 +362,8 @@ fi
 #  LICENSE / REGISTER CHECK (PRIVATE)  -  IP + NAME COMBINATION
 #-------------------------------------------------------------------------------
 MYIP=$(curl -sS ipv4.icanhazip.com 2>/dev/null || echo "")
-LICENSE_URL="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/register"
+# *** FIXED: use public license repo ***
+LICENSE_URL="https://raw.githubusercontent.com/asloma1984/northafrica-license/main/register"
 
 license_denied_not_registered() {
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
@@ -411,11 +412,11 @@ license_check() {
     license_denied_not_registered
   }
 
-  # Register line format example:
+  # Register line format example (comment line):
   # ### Abdul 2027-08-09 31.14.135.141
   # Field2 = name, Field3 = expiry, last field = IP
   line=$(echo "$data" \
-    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$NF==ip && $2==name {print}')
+    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$1=="###" && $NF==ip && $2==name {print}')
 
   if [[ -z "$line" ]]; then
     license_denied_not_registered
