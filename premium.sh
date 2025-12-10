@@ -1,6 +1,6 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# System Requirements : Debian 9–13 / Ubuntu 18–25
 # Developer » Abdul (NorthAfrica Script)
 # Channel   » https://t.me/northafrica9
 # Group     » https://t.me/groupnorthafrica
@@ -77,7 +77,7 @@ fix_dns() {
 
   # Special fix for Ubuntu 24.04
   if [[ "$OS_ID" == "ubuntu" && "$OS_VERSION" == "24.04" ]]; then
-    echo -e "${YELLOW}[*] Ubuntu 24.04 detected - Applying DNS fix...${NC}"
+    echo -e "${YELLOW}[*] Ubuntu 24.04 detected - applying DNS fix...${NC}"
 
     # Stop and disable systemd-resolved
     systemctl stop systemd-resolved 2>/dev/null || true
@@ -133,7 +133,7 @@ EOF
     echo -e "${OK} DNS is working properly${NC}"
     return 0
   else
-    echo -e "${ERROR} DNS still not working! Installation may fail.${NC}"
+    echo -e "${ERROR} DNS is still not working! Installation may fail.${NC}"
     return 1
   fi
 }
@@ -322,7 +322,7 @@ clear && clear && clear
 # Banner
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "  Developer » ${YELLOW}Abdul (NorthAfrica Script)${NC} ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
-echo -e "  » Auto install VPN & Xray server on your VPS"
+echo -e "  » Auto-install VPN & Xray server on your VPS"
 echo -e "  Channel : ${green}@northafrica9${NC}"
 echo -e "  Group   : ${green}@groupnorthafrica${NC}"
 echo -e "  Recode by North Africa (2025)"
@@ -801,10 +801,10 @@ install_xray() {
   curl -s ipinfo.io/city >>/etc/xray/city 2>/dev/null || echo "Unknown" >>/etc/xray/city
   curl -s ipinfo.io/org | cut -d " " -f 2-10 >>/etc/xray/isp 2>/dev/null || echo "Unknown" >>/etc/xray/isp
 
-  print_install "Install configuration packets"
+  print_install "Install configuration files"
   safe_download "${REPO}config/haproxy.cfg" /etc/haproxy/haproxy.cfg
-  safe_download "${REPO}config/xray.conf" /etc/nginx/conf.d/xray.conf
-  safe_download "${REPO}config/ws.conf"   /etc/nginx/conf.d/ws.conf
+  safe_download "${REPO}config/xray.conf"   /etc/nginx/conf.d/xray.conf
+  safe_download "${REPO}config/ws.conf"     /etc/nginx/conf.d/ws.conf
 
   sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
   sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
@@ -850,7 +850,7 @@ install_xray() {
 
   chmod +x /etc/systemd/system/runn.service
 
-  cat >/etc/systemd/system/xray.service <<EOF
+cat >/etc/systemd/system/xray.service <<EOF
 [Unit]
 Description=Xray Service
 Documentation=https://github.com
@@ -888,7 +888,7 @@ ssh(){
 
   DEBIAN_FRONTEND=noninteractive dpkg-reconfigure keyboard-configuration 2>/dev/null || true
 
-  cat > /etc/systemd/system/rc-local.service <<-END
+cat > /etc/systemd/system/rc-local.service <<-END
 [Unit]
 Description=/etc/rc.local
 ConditionPathExists=/etc/rc.local
@@ -903,7 +903,7 @@ SysVStartPriority=99
 WantedBy=multi-user.target
 END
 
-  cat > /etc/rc.local <<-END
+cat > /etc/rc.local <<-END
 #!/bin/sh -e
 # rc.local
 exit 0
@@ -941,7 +941,7 @@ password_default(){ :; }
 
 udp_mini(){
   clear
-  print_install "Install Service Limit IP & Quota"
+  print_install "Install IP & quota limit service"
   safe_download "${REPO}config/fv-tunnel" fv-tunnel
   chmod +x fv-tunnel && ./fv-tunnel
 
@@ -959,13 +959,13 @@ udp_mini(){
   systemctl enable  udp-mini-1 udp-mini-2 udp-mini-3
   systemctl start   udp-mini-1 udp-mini-2 udp-mini-3
 
-  print_success "Limit IP Service"
+  print_success "IP limit service"
 }
 
 # Install SlowDNS - FIXED FOR UBUNTU 24.04
 install_slowdns() {
   clear
-  print_install "Installing SlowDNS (DNSTT) Server"
+  print_install "Installing SlowDNS (DNSTT) server"
 
   CONFIG_DIR="/etc/slowdns"
   INSTALL_DIR="/usr/local/bin"
@@ -1032,12 +1032,12 @@ EOF
   systemctl enable slowdns
   systemctl restart slowdns
 
-  print_success "SlowDNS Installed Successfully"
+  print_success "SlowDNS installed successfully"
 }
 
 ins_SSHD(){
   clear
-  print_install "Install SSHD"
+  print_install "Install SSHD configuration"
   safe_download "${REPO}files/sshd" /etc/ssh/sshd_config
   chmod 600 /etc/ssh/sshd_config
 
@@ -1188,7 +1188,7 @@ EOF
 
 ins_swab(){
   clear
-  print_install "Install Swap 1 GB & BBR"
+  print_install "Install 1 GB swap & BBR"
 
   # Install gotop if available
   gotop_latest="$(curl -s https://api.github.com/repos/xxxserxxx/gotop/releases 2>/dev/null | grep tag_name | sed -E 's/.*\"v(.*)\".*/\1/' | head -n 1 || echo "")"
@@ -1216,7 +1216,7 @@ ins_swab(){
 
 ins_Fail2ban(){
   clear
-  print_install "Install Fail2ban & banner"
+  print_install "Install Fail2ban & SSH banner"
 
   apt install -y fail2ban 2>/dev/null || true
 
@@ -1255,7 +1255,7 @@ ins_limit_services(){
 # ePro WebSocket Proxy
 ins_epro(){
   clear
-  print_install "Install ePro WebSocket Proxy"
+  print_install "Install ePro WebSocket proxy"
 
   safe_download "${REPO}files/ws" /usr/bin/ws
   safe_download "${REPO}config/tun.conf" /usr/bin/tun.conf
@@ -1297,7 +1297,7 @@ ins_epro(){
 
   apt autoclean -y 2>/dev/null || true
   apt autoremove -y 2>/dev/null || true
-  print_success "ePro WebSocket Proxy"
+  print_success "ePro WebSocket proxy"
 }
 
 ins_restart(){
@@ -1343,7 +1343,7 @@ ins_restart(){
 # Install Menu
 menu(){
   clear
-  print_install "Install Menu scripts"
+  print_install "Install menu scripts"
   safe_download "${REPO}menu/menu.zip" menu.zip
   unzip -o menu.zip 2>/dev/null || true
   chmod +x menu/* 2>/dev/null || true
