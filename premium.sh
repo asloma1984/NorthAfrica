@@ -196,7 +196,7 @@ safe_curl() {
 
     retry_count=$((retry_count + 1))
     echo -e "${YELLOW}[*] Curl failed (HTTP $http_code), retry $retry_count/$max_retries...${NC}"
-    sleep 3
+      sleep 3
 
     if ! ping -c1 -W2 google.com &>/dev/null; then
       fix_dns
@@ -360,9 +360,13 @@ fi
 
 #-------------------------------------------------------------------------------
 #  LICENSE / REGISTER CHECK (PRIVATE)  -  IP + NAME COMBINATION
+#  NEW FORMAT: each line in register is:
+#     NAME|IP|YYYY-MM-DD
+#  - NAME and IP are required
+#  - Expiry date (YYYY-MM-DD) is optional; if missing, license never expires
 #-------------------------------------------------------------------------------
 MYIP=$(curl -sS ipv4.icanhazip.com 2>/dev/null || echo "")
-LICENSE_URL="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/register"
+LICENSE_URL="https://raw.githubusercontent.com/asloma1984/northafrica-license/main/register"
 
 license_denied_not_registered() {
   echo -e "\033[1;93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
@@ -411,30 +415,42 @@ license_check() {
     license_denied_not_registered
   }
 
-  # Register line format example:
-  # ### Abdul 2027-08-09 31.14.135.141
-  # Field2 = name, Field3 = expiry, last field = IP
+  # Register line format:
+  #   NAME|IP|YYYY-MM-DD
+  # Example:
+  #   Abdul|172.237.120.250|2027-08-09
+  # Name (field1) must match SUBSCRIBER_NAME
+  # IP   (field2) must match MYIP
   line=$(echo "$data" \
-    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$NF==ip && $2==name {print}')
+    | awk -F'|' -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$2==ip && $1==name {print}')
 
   if [[ -z "$line" ]]; then
     license_denied_not_registered
   fi
 
-  USERNAME=$(echo "$line" | awk '{print $2}')
-  EXP_DATE=$(echo "$line" | awk '{print $3}')
+  USERNAME=$(echo "$line" | awk -F'|' '{print $1}')
+  REGISTER_IP=$(echo "$line" | awk -F'|' '{print $2}')
+  EXP_DATE=$(echo "$line" | awk -F'|' '{print $3}')
 
   today=$(date +%Y-%m-%d)
 
-  if [[ "$today" > "$EXP_DATE" ]]; then
-    license_denied_expired "$EXP_DATE"
+  # If expiry date is present and today is after expiry, deny
+  if [[ -n "$EXP_DATE" ]]; then
+    if [[ "$today" > "$EXP_DATE" ]]; then
+      license_denied_expired "$EXP_DATE"
+    fi
   fi
 
   rm -f /usr/bin/user /usr/bin/e
   echo "$USERNAME" >/usr/bin/user
   echo "$EXP_DATE" >/usr/bin/e
 
-  echo -e "${OK} License OK for user ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
+  echo -e "${OK} License OK for user ${green}$USERNAME${NC}"
+  if [[ -n "$EXP_DATE" ]]; then
+    echo -e "${OK} License expiry date: ${YELLOW}$EXP_DATE${NC}"
+  else
+    echo -e "${OK} License has no expiry date (lifetime).${NC}"
+  fi
 }
 
 license_check
@@ -673,9 +689,12 @@ restart_system(){
   izinsc="$LICENSE_URL"
 
   rm -f /usr/bin/user /usr/bin/e
-  line=$(safe_curl "$izinsc" | awk -v ip="$MYIP" '$NF==ip {print}')
-  username=$(echo "$line" | awk '{print $2}')
-  expx=$(echo "$line" | awk '{print $3}')
+
+  # Parse license again (same NAME|IP|YYYY-MM-DD format)
+  line=$(safe_curl "$izinsc" | awk -F'|' -v ip="$MYIP" '$2==ip {print}' | head -n1)
+  username=$(echo "$line" | awk -F'|' '{print $1}')
+  expx=$(echo "$line" | awk -F'|' '{print $3}')
+
   echo "$username" >/usr/bin/user
   echo "$expx" >/usr/bin/e
 
@@ -689,11 +708,17 @@ restart_system(){
   Info="(${green}Active${NC})"
   ErrorInfo="(${RED}Expired${NC})"
   today=$(date -d "0 days" +"%Y-%m-%d")
-  Exp1=$(echo "$line" | awk '{print $3}')
-  if [[ $today < $Exp1 ]]; then
-    sts="${Info}"
+  Exp1=$(echo "$line" | awk -F'|' '{print $3}')
+
+  if [[ -n "$Exp1" ]]; then
+    if [[ "$today" < "$Exp1" ]]; then
+      sts="${Info}"
+    else
+      sts="${ErrorInfo}"
+    fi
   else
-    sts="${ErrorInfo}"
+    # No expiry date means always active
+    sts="${Info}"
   fi
 
   # Telegram bot (optional) – disabled
@@ -1281,7 +1306,7 @@ ins_epro(){
   iptables -A FORWARD -m string --string "get_peers" --algo bm -j DROP 2>/dev/null || true
   iptables -A FORWARD -m string --string "announce_peer" --algo bm -j DROP 2>/dev/null || true
   iptables -A FORWARD -m string --string "find_node" --algo bm -j DROP 2>/dev/null || true
-  iptables -A FORWARD -m string --algo bm --string "BitTorrent" -j DROP 2>/dev/null || true
+  iptables -A FORWARD -m string --string "BitTorrent" -j DROP 2>/dev/null || true
   iptables -A FORWARD -m string --algo bm --string "BitTorrent protocol" -j DROP 2>/dev/null || true
   iptables -A FORWARD -m string --algo bm --string "peer_id=" -j DROP 2>/dev/null || true
   iptables -A FORWARD -m string --algo bm --string ".torrent" -j DROP 2>/dev/null || true
