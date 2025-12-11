@@ -1,16 +1,14 @@
 [Unit]
 Description=Python Proxy DragonTunneling
-Documentation=https://t.me/Renzy_Store
-After=network.target nss-lookup.target
-
+Documentation=https://t.me/northafrica9
+After=network.target
 [Service]
-Type=simple
+Type=oneshot
 User=root
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
-NoNewPrivileges=true
-ExecStart=/usr/bin/python -O /usr/bin/ws.py
-Restart=on-failure
-
+WorkingDirectory=/root
+# This service is kept only for compatibility.
+# It does nothing but always succeeds, so it will not fail in systemd.
+ExecStart=/bin/true
+RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
