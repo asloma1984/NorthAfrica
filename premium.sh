@@ -595,7 +595,7 @@ base_package() {
     libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev \
     flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev \
     libssl-dev libsqlite3-dev sed dirmngr libxml-parser-perl build-essential \
-    gcc g++ python3 python3-pip htop lsof tar wget curl ruby zip unzip p7zip-full \
+    gcc g++ python3 python3-pip python-is-python3 htop lsof tar wget curl ruby zip unzip p7zip-full \
     libc6 util-linux ca-certificates bsd-mailx \
     net-tools openssl gnupg gnupg2 lsb-release shc cmake git screen \
     xz-utils apt-transport-https dnsutils jq openvpn easy-rsa 2>/dev/null || true
@@ -949,6 +949,13 @@ udp_mini(){
   safe_download "${REPO}files/udp-mini" /usr/local/kyt/udp-mini
   chmod +x /usr/local/kyt/udp-mini
 
+  # ===== NEW: install limit-ip core script from repo =====
+  mkdir -p /usr/local/sbin
+  safe_download "${REPO}files/limit-ip" /usr/local/sbin/limit-ip
+  chmod +x /usr/local/sbin/limit-ip
+  ln -sf /usr/local/sbin/limit-ip /usr/bin/limit-ip
+  # =======================================================
+
   # service units moved to config/services
   safe_download "${REPO}config/services/udp-mini-1.service" /etc/systemd/system/udp-mini-1.service
   safe_download "${REPO}config/services/udp-mini-2.service" /etc/systemd/system/udp-mini-2.service
@@ -1238,6 +1245,13 @@ ins_Fail2ban(){
 ins_limit_services(){
   clear
   print_install "Install limit services"
+
+  # Clean old limit-ip services if present (vmip/vlip/trip)
+  systemctl disable vmip vlip trip 2>/dev/null || true
+  systemctl stop    vmip vlip trip 2>/dev/null || true
+  rm -f /etc/systemd/system/vmip.service \
+        /etc/systemd/system/vlip.service \
+        /etc/systemd/system/trip.service 2>/dev/null || true
 
   safe_download "${REPO}config/services/limitshadowsocks.service" /etc/systemd/system/limitshadowsocks.service
   safe_download "${REPO}config/services/limittrojan.service"      /etc/systemd/system/limittrojan.service
