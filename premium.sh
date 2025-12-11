@@ -773,12 +773,15 @@ make_folder_xray() {
   echo "echo -e 'Vps Config User Account'" >> /etc/user-create/user.log
 }
 
-# Install Xray core - USES config/config.json ONLY
+# ─────────────────────────────────────────────
+# Install Xray core  (FIXED PATH / SYMLINK)
+# ─────────────────────────────────────────────
 install_xray() {
   clear
   print_install "Install Xray Core (latest)"
-  domainSock_dir="/run/xray"
-  [[ -d "$domainSock_dir" ]] || mkdir "$domainSock_dir"
+
+  local domainSock_dir="/run/xray"
+  [[ -d "$domainSock_dir" ]] || mkdir -p "$domainSock_dir"
   chown www-data:www-data "$domainSock_dir"
 
   # Install Xray using official script
@@ -786,20 +789,35 @@ install_xray() {
   chmod +x /tmp/install-xray.sh
   /tmp/install-xray.sh install -u www-data
 
-  # Download Xray config from repo (config/config.json)
+  # Make sure config dirs exist
+  mkdir -p /etc/xray
+  mkdir -p /usr/local/etc/xray
+
+  # Download Xray config from repo (config/config.json) to /etc/xray
   if ! safe_download "${REPO}config/config.json" /etc/xray/config.json; then
     print_error "Xray config.json not found in repo (config/config.json)"
     exit 1
   fi
 
-  # runn.service moved to config/services
+  # Ensure systemd drop-in and menu use the SAME config file:
+  # /usr/local/etc/xray/config.json -> /etc/xray/config.json
+  if [[ -f /usr/local/etc/xray/config.json && ! -L /usr/local/etc/xray/config.json ]]; then
+    mv /usr/local/etc/xray/config.json "/usr/local/etc/xray/config.json.bak-$(date +%F-%H%M%S)"
+  fi
+  ln -sf /etc/xray/config.json /usr/local/etc/xray/config.json
+
+  # runn.service from repo
   safe_download "${REPO}config/services/runn.service" /etc/systemd/system/runn.service
+  chmod +x /etc/systemd/system/runn.service
+
+  local domain
   domain=$(cat /etc/xray/domain 2>/dev/null || echo "localhost")
+
   print_success "Xray Core installed"
 
   clear
-  curl -s ipinfo.io/city >>/etc/xray/city 2>/dev/null || echo "Unknown" >>/etc/xray/city
-  curl -s ipinfo.io/org | cut -d " " -f 2-10 >>/etc/xray/isp 2>/dev/null || echo "Unknown" >>/etc/xray/isp
+  curl -s ipinfo.io/city 2>/dev/null  | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > /etc/xray/city  || echo "Unknown" > /etc/xray/city
+  curl -s ipinfo.io/org 2>/dev/null   | cut -d " " -f 2-10                  > /etc/xray/isp   || echo "Unknown" > /etc/xray/isp
 
   print_install "Install configuration files"
   safe_download "${REPO}config/haproxy.cfg" /etc/haproxy/haproxy.cfg
@@ -848,8 +866,7 @@ install_xray() {
   chmod 644 /etc/xray/xray.crt
   chmod 600 /etc/haproxy/hap.pem
 
-  chmod +x /etc/systemd/system/runn.service
-
+  # xray.service – still points to /etc/xray/config.json
 cat >/etc/systemd/system/xray.service <<EOF
 [Unit]
 Description=Xray Service
@@ -870,6 +887,10 @@ LimitNOFILE=1000000
 [Install]
 WantedBy=multi-user.target
 EOF
+
+  systemctl daemon-reload
+  systemctl enable xray 2>/dev/null || true
+  systemctl restart xray 2>/dev/null || true
 
   print_success "Xray configuration"
 }
