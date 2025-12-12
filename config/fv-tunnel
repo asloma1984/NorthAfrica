@@ -1,52 +1,72 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# System Request : Debian 9+/Ubuntu 18.04+/20+
-# Develovers » Tøxic savage࿐
-# Email      » johntezali56@gmail.com
-# telegram   » https://t.me/ToxicSavage
-# whatsapp   » wa.me/+254716637803
+# System Request : Debian 9 to 13 / Ubuntu 18 to 25
+# Developer  » Abdul (NorthAfrica Script)
+# Channel    » https://t.me/northafrica9
+# Group      » https://t.me/groupnorthafrica
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-REPO="https://raw.githubusercontent.com/savagetech56/premium/main/"
+# Base repository (your GitHub)
+REPO="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main/"
 
-wget -q -O /etc/systemd/system/limitvmess.service "${REPO}files/limitvmess.service" && chmod +x limitvmess.service >/dev/null 2>&1
-wget -q -O /etc/systemd/system/limitvless.service "${REPO}files/limitvless.service" && chmod +x limitvless.service >/dev/null 2>&1
-wget -q -O /etc/systemd/system/limittrojan.service "${REPO}files/limittrojan.service" && chmod +x limittrojan.service >/dev/null 2>&1
-wget -q -O /etc/systemd/system/limitshadowsocks.service "${REPO}files/limitshadowsocks.service" && chmod +x limitshadowsocks.service >/dev/null 2>&1
+# ─────────────────────────────────────────────
+# Download systemd services for traffic limits
+#  (PATH = config/services/*.service)
+# ─────────────────────────────────────────────
+wget -q -O /etc/systemd/system/limitvmess.service \
+    "${REPO}config/services/limitvmess.service" >/dev/null 2>&1
+chmod +x /etc/systemd/system/limitvmess.service >/dev/null 2>&1
+
+wget -q -O /etc/systemd/system/limitvless.service \
+    "${REPO}config/services/limitvless.service" >/dev/null 2>&1
+chmod +x /etc/systemd/system/limitvless.service >/dev/null 2>&1
+
+wget -q -O /etc/systemd/system/limittrojan.service \
+    "${REPO}config/services/limittrojan.service" >/dev/null 2>&1
+chmod +x /etc/systemd/system/limittrojan.service >/dev/null 2>&1
+
+wget -q -O /etc/systemd/system/limitshadowsocks.service \
+    "${REPO}config/services/limitshadowsocks.service" >/dev/null 2>&1
+chmod +x /etc/systemd/system/limitshadowsocks.service >/dev/null 2>&1
+
+# ─────────────────────────────────────────────
+# Download XRAY traffic-limit helper scripts
+#  (PATH = files/vmess|vless|trojan|shadowsocks)
+# ─────────────────────────────────────────────
 wget -q -O /etc/xray/limit.vmess "${REPO}files/vmess" >/dev/null 2>&1
 wget -q -O /etc/xray/limit.vless "${REPO}files/vless" >/dev/null 2>&1
 wget -q -O /etc/xray/limit.trojan "${REPO}files/trojan" >/dev/null 2>&1
 wget -q -O /etc/xray/limit.shadowsocks "${REPO}files/shadowsocks" >/dev/null 2>&1
-chmod +x /etc/xray/limit.vmess
-chmod +x /etc/xray/limit.vless
-chmod +x /etc/xray/limit.trojan
-chmod +x /etc/xray/limit.shadowsocks
-systemctl daemon-reload
-systemctl enable --now limitvmess
-systemctl enable --now limitvless
-systemctl enable --now limittrojan
-systemctl enable --now limitshadowsocks
-# systemctl start limitvmess
-# systemctl start limitvless
-# systemctl start limittrojan
-# systemctl start limitshadowsocks
-# systemctl restart limitvmess
-# systemctl restart limitvless
-# systemctl restart limittrojan
-# systemctl restart limitshadowsocks
 
+chmod +x /etc/xray/limit.vmess >/dev/null 2>&1
+chmod +x /etc/xray/limit.vless >/dev/null 2>&1
+chmod +x /etc/xray/limit.trojan >/dev/null 2>&1
+chmod +x /etc/xray/limit.shadowsocks >/dev/null 2>&1
+
+# Reload systemd and enable limit services
+systemctl daemon-reload
+systemctl enable --now limitvmess >/dev/null 2>&1
+systemctl enable --now limitvless >/dev/null 2>&1
+systemctl enable --now limittrojan >/dev/null 2>&1
+systemctl enable --now limitshadowsocks >/dev/null 2>&1
+
+# ─────────────────────────────────────────────
+# Download limit-ip main script (files/limit-ip)
+# ─────────────────────────────────────────────
 cd
-wget -q -O /usr/bin/limit-ip "${REPO}files/limit-ip"
-chmod +x /usr/bin/*
-cd /usr/bin
-sed -i 's/\r//' limit-ip
-cd
-clear
-# // SERVICE LIMIT IP VMESS
+wget -q -O /usr/bin/limit-ip "${REPO}files/limit-ip" >/dev/null 2>&1
+chmod +x /usr/bin/limit-ip >/dev/null 2>&1
+sed -i 's/\r//' /usr/bin/limit-ip
+
+# ─────────────────────────────────────────────
+# Create systemd services for IP limiter
+# ─────────────────────────────────────────────
+
+# LIMIT IP VMESS
 cat >/etc/systemd/system/vmip.service << EOF
 [Unit]
-Description=My
-ProjectAfter=network.target
+Description=Limit IP for VMESS clients
+After=network.target
 
 [Service]
 WorkingDirectory=/root
@@ -57,11 +77,11 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# // SERVICE LIMIT IP VLESS
+# LIMIT IP VLESS
 cat >/etc/systemd/system/vlip.service << EOF
 [Unit]
-Description=My
-ProjectAfter=network.target
+Description=Limit IP for VLESS clients
+After=network.target
 
 [Service]
 WorkingDirectory=/root
@@ -72,11 +92,11 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# // SERVICE LIMIT TROJAN
+# LIMIT IP TROJAN
 cat >/etc/systemd/system/trip.service << EOF
 [Unit]
-Description=My
-ProjectAfter=network.target
+Description=Limit IP for TROJAN clients
+After=network.target
 
 [Service]
 WorkingDirectory=/root
@@ -86,12 +106,17 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
-systemctl restart vmip
-systemctl enable vmip
-systemctl restart vlip
-systemctl enable vlip
-systemctl restart trip
-systemctl enable trip
 
-rm -rf /root/fv-tunnel
+# Reload and start IP-limit services
+systemctl daemon-reload
+systemctl restart vmip >/dev/null 2>&1
+systemctl enable  vmip >/dev/null 2>&1
+systemctl restart vlip >/dev/null 2>&1
+systemctl enable  vlip >/dev/null 2>&1
+systemctl restart trip >/dev/null 2>&1
+systemctl enable  trip >/dev/null 2>&1
+
+# Clean up
+rm -f /root/fv-tunnel
+clear
+echo "fv-tunnel & limit-ip installation completed."
