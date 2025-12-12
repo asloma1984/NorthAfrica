@@ -86,76 +86,49 @@ get_public_ip() {
 }
 
 # ===========================================
-# FIX DNS FOR UBUNTU 24.04 - CRITICAL FIX
+# DNS FIX (SAFE FOR Ubuntu 18-25 + Debian 9-13)
+# - Avoids: rm: cannot remove /etc/resolv.conf: Operation not permitted
+# - Uses systemd-resolved properly when available
 # ===========================================
 fix_dns() {
   echo -e "${YELLOW}[*] Checking DNS configuration...${NC}"
 
   # Backup current resolv.conf
-  cp /etc/resolv.conf /etc/resolv.conf.backup 2>/dev/null
+  cp -af /etc/resolv.conf /etc/resolv.conf.backup 2>/dev/null || true
 
-  # Detect Ubuntu 24.04 specifically
-  if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS_ID="$ID"
-    OS_VERSION="$VERSION_ID"
-  fi
+  # Remove immutable if set (fixes "Operation not permitted")
+  chattr -i /etc/resolv.conf 2>/dev/null || true
 
-  # Special fix for Ubuntu 24.04
-  if [[ "$OS_ID" == "ubuntu" && "$OS_VERSION" == "24.04" ]]; then
-    echo -e "${YELLOW}[*] Ubuntu 24.04 detected - applying DNS fix...${NC}"
+  # If systemd-resolved is active, configure it instead of deleting resolv.conf
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+    mkdir -p /etc/systemd/resolved.conf.d
 
-    # Stop and disable systemd-resolved
-    systemctl stop systemd-resolved 2>/dev/null || true
-    systemctl disable systemd-resolved 2>/dev/null || true
-    systemctl mask systemd-resolved 2>/dev/null || true
+    cat > /etc/systemd/resolved.conf.d/99-northafrica-dns.conf <<'EOF'
+[Resolve]
+DNS=1.1.1.1 8.8.8.8
+FallbackDNS=8.8.4.4 208.67.222.222
+DNSSEC=no
+EOF
 
-    # Create new resolv.conf with public DNS
-    rm -f /etc/resolv.conf
-    cat > /etc/resolv.conf << EOF
-# Fixed by VPS Installer
+    # Ensure resolv.conf avoids stub if possible
+    ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null || true
+    systemctl restart systemd-resolved 2>/dev/null || true
+  else
+    # No systemd-resolved: write static resolv.conf
+    rm -f /etc/resolv.conf 2>/dev/null || true
+    cat > /etc/resolv.conf <<'EOF'
+# Fixed by NorthAfrica Installer
+nameserver 1.1.1.1
 nameserver 8.8.8.8
 nameserver 8.8.4.4
-nameserver 1.1.1.1
 nameserver 208.67.222.222
 options rotate timeout:1 attempts:2
 EOF
-
-    # Make it immutable to prevent systemd from changing it
-    chattr -i /etc/resolv.conf 2>/dev/null || true
-    chattr +i /etc/resolv.conf 2>/dev/null || true
-
-    # Restart networking
-    systemctl restart systemd-networkd 2>/dev/null || true
-    sleep 2
-
-    # Test DNS
-    if ping -c1 -W2 google.com &>/dev/null; then
-      echo -e "${OK} DNS fix applied successfully${NC}"
-    else
-      echo -e "${YELLOW}[*] DNS test failed, trying alternative method...${NC}"
-
-      # Alternative: Use dhclient to get DNS
-      dhclient -r 2>/dev/null || true
-      dhclient 2>/dev/null || true
-      sleep 2
-
-      # Create manual DNS if still broken
-      echo "nameserver 1.1.1.1" > /etc/resolv.conf
-      echo "nameserver 8.8.8.8" >> /etc/resolv.conf
-    fi
-  else
-    # For other systems
-    if ! ping -c1 -W2 google.com &>/dev/null; then
-      echo -e "${YELLOW}[*] DNS not working, setting up public DNS...${NC}"
-      rm -f /etc/resolv.conf 2>/dev/null
-      echo "nameserver 8.8.8.8" > /etc/resolv.conf
-      echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-    fi
+    chmod 644 /etc/resolv.conf 2>/dev/null || true
   fi
 
-  # Final DNS test
-  if ping -c1 -W2 google.com &>/dev/null; then
+  # Test DNS
+  if getent hosts google.com >/dev/null 2>&1; then
     echo -e "${OK} DNS is working properly${NC}"
     return 0
   else
@@ -192,7 +165,7 @@ safe_download() {
     sleep 3
 
     # Fix DNS again if needed
-    if ! ping -c1 -W2 google.com &>/dev/null; then
+    if ! getent hosts google.com >/dev/null 2>&1; then
       fix_dns
     fi
   done
@@ -224,7 +197,7 @@ safe_curl() {
     echo -e "${YELLOW}[*] Curl failed (HTTP $http_code), retry $retry_count/$max_retries...${NC}"
     sleep 3
 
-    if ! ping -c1 -W2 google.com &>/dev/null; then
+    if ! getent hosts google.com >/dev/null 2>&1; then
       fix_dns
     fi
   done
@@ -338,8 +311,8 @@ fix_dns
 ensure_early_dependencies
 detect_os
 
-# Export public IP
-export IP=$(curl -sS icanhazip.com 2>/dev/null || echo "")
+# Export public IP (robust)
+export IP="$(get_public_ip)"
 
 # Detect default network interface for vnstat
 NET=$(ip -o -4 route show to default 2>/dev/null | awk 'NR==1 {print $5}')
