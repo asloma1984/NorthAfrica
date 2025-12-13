@@ -1143,6 +1143,36 @@ EOF
   print_success "Dropbear"
 }
 
+# ─────────────────────────────────────────────
+# Squid Proxy Installation
+# ─────────────────────────────────────────────
+ins_squid(){
+  clear
+  print_install "Install Squid Proxy"
+
+  apt-get install -y squid 2>/dev/null || {
+    print_error "Failed to install Squid package"
+    return 1
+  }
+
+  # Download Squid configuration from repo (config/squid/squid.conf)
+  safe_download "${REPO}config/squid/squid.conf" /etc/squid/squid.conf
+
+  mkdir -p /var/log/squid
+  chown proxy:proxy /var/log/squid -R 2>/dev/null || true
+
+  systemctl daemon-reload
+  systemctl enable squid 2>/dev/null || true
+  systemctl restart squid 2>/dev/null || true
+
+  # Open Squid port
+  iptables -I INPUT -p tcp --dport 3128 -j ACCEPT 2>/dev/null || true
+  netfilter-persistent save 2>/dev/null || true
+  netfilter-persistent reload 2>/dev/null || true
+
+  print_success "Squid Proxy"
+}
+
 ins_vnstat(){
   clear
   print_install "Install Vnstat"
@@ -1357,6 +1387,7 @@ ins_restart(){
   restart_service openvpn
   restart_service ssh
   restart_service dropbear
+  restart_service squid
   restart_service fail2ban
   restart_service vnstat
   restart_service haproxy
@@ -1379,6 +1410,7 @@ ins_restart(){
   systemctl enable fail2ban 2>/dev/null || true
   systemctl enable ssh 2>/dev/null || true
   systemctl enable slowdns 2>/dev/null || true
+  systemctl enable squid 2>/dev/null || true
 
   history -c
   echo "unset HISTFILE" >> /etc/profile
@@ -1509,6 +1541,7 @@ enable_services(){
   systemctl enable ssh 2>/dev/null || true
   systemctl enable ws 2>/dev/null || true
   systemctl enable slowdns 2>/dev/null || true
+  systemctl enable squid 2>/dev/null || true
   print_success "Services enabled"
   clear
 }
@@ -1529,6 +1562,7 @@ instal(){
   install_slowdns
   ins_SSHD
   ins_dropbear
+  ins_squid
   ins_vnstat
   ins_openvpn
   ins_backup
