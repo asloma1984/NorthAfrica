@@ -4,13 +4,13 @@ set -e
 REPO_BASE="https://raw.githubusercontent.com/asloma1984/NorthAfrica/main"
 ENC_URL="$REPO_BASE/premium.enc"
 
-# تأكد من وجود curl
+# Ensure curl is installed
 if ! command -v curl >/dev/null 2>&1; then
   apt update -y && apt install -y curl
 fi
 
-# تأكد من وجود openssl
-if ! command -v openssl >/dev/null 2>&1; then
+# Ensure openssl is installed
+if ! command- v openssl >/dev/null 2>&1; then
   apt update -y && apt install -y openssl
 fi
 
@@ -18,14 +18,14 @@ TMP=$(mktemp)
 
 echo ""
 echo "Downloading encrypted installer..."
-# تحميل الملف المشفَّر من GitHub
+# Download encrypted file from GitHub
 if ! curl -fsSL "$ENC_URL" -o "$TMP"; then
   echo "[ERROR] Failed to download premium.enc"
   rm -f "$TMP"
   exit 1
 fi
 
-# طلب نفس الباسورد الذي استعملته في openssl enc
+# Ask for the same password used with openssl enc
 read -s -p "Enter installer password: " PASS
 echo ""
 
