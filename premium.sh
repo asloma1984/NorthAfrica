@@ -299,14 +299,67 @@ restart_service() {
   return 1
 }
 
-# Function to clean input and fix buffer issues
+# Function to clean input and fix buffer issues - ENHANCED VERSION
 clean_input() {
     local input="$1"
-    # Remove carriage returns, newlines, and extra spaces
-    input=$(echo "$input" | tr -d '\r\n' | xargs)
-    # Remove any non-alphanumeric characters (optional)
-    input=$(echo "$input" | sed 's/[^a-zA-Z0-9]//g')
+    # Remove all control characters and escape sequences
+    input=$(echo "$input" | sed 's/[[:cntrl:]]//g')
+    # Remove ANSI escape sequences
+    input=$(echo "$input" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
+    # Remove carriage returns, newlines
+    input=$(echo "$input" | tr -d '\r\n')
+    # Trim leading and trailing whitespace
+    input=$(echo "$input" | xargs)
+    # Remove any non-printable characters
+    input=$(echo "$input" | tr -cd '\11\12\15\40-\176')
     echo "$input"
+}
+
+# Function to safely read input without escape sequences
+safe_read() {
+    local prompt="$1"
+    local variable="$2"
+    
+    # Save current terminal settings
+    local old_stty
+    old_stty=$(stty -g)
+    
+    # Disable echo and canonical processing
+    stty -echo -icanon
+    
+    # Clear input buffer
+    while read -t 0; do read -r; done
+    
+    # Print prompt
+    echo -n "$prompt"
+    
+    # Read input character by character to avoid escape sequences
+    local input=""
+    local char
+    local IFS=''
+    
+    while true; do
+        char=$(dd bs=1 count=1 2>/dev/null)
+        case "$char" in
+            $'\n') break ;;  # Enter key
+            $'\177') # Backspace
+                if [ -n "$input" ]; then
+                    input="${input%?}"
+                    echo -n $'\b \b'
+                fi
+                ;;
+            [[:print:]]) # Printable characters only
+                input="$input$char"
+                echo -n "$char"
+                ;;
+        esac
+    done
+    
+    # Restore terminal settings
+    stty "$old_stty"
+    
+    echo
+    eval "$variable=\"$input\""
 }
 
 # ─────────────────────────────────────────────────────
@@ -363,19 +416,22 @@ fi
 # Ask for client name (as in register file) - FIXED INPUT ISSUE
 echo ""
 echo -e "Please Enter Your Client Name"
-# Clear input buffer before reading
-while read -t 0; do read -r; done
-# Read input without color formatting to avoid buffer issues
-read -rp "Client Name : " SUBSCRIBER_NAME
-# Remove any carriage returns or extra characters
-SUBSCRIBER_NAME=$(clean_input "$SUBSCRIBER_NAME")
-echo -e "Checking client name, please wait...."
-sleep 2
 
+# Use safe_read function to avoid escape sequences
+safe_read "Client Name : " SUBSCRIBER_NAME
+
+# Clean the input thoroughly
+SUBSCRIBER_NAME=$(clean_input "$SUBSCRIBER_NAME")
+
+# Validate input
 if [[ -z "$SUBSCRIBER_NAME" ]]; then
   echo -e "${ERROR} Client name cannot be empty.${NC}"
   clean_and_exit
 fi
+
+# Show what was entered (for debugging)
+echo -e "Checking client name ($SUBSCRIBER_NAME), please wait...."
+sleep 2
 
 #-------------------------------------------------------------------------------
 #  LICENSE / REGISTER CHECK (PRIVATE)  -  IP + NAME COMBINATION
@@ -653,14 +709,15 @@ pasang_domain() {
   echo -e "  1) Use your domain (recommended)"
   echo -e "  2) Use random subdomain via Cloudflare script"
   echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  read -p " Select 1-2 (or any key for random) : " host
+  safe_read "Select 1-2 (or any key for random) : " host
   echo ""
 
   if [[ $host == "1" ]]; then
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo -e "  Enter your MAIN domain (example: vpn.yourdomain.com)"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    read -p " Input Domain : " DOMAIN
+    safe_read "Input Domain : " DOMAIN
+    DOMAIN=$(clean_input "$DOMAIN")
     if [[ -z "$DOMAIN" ]]; then
       echo -e "\e[31m[ERROR] Domain cannot be empty!\e[0m"
       exit 1
@@ -687,7 +744,8 @@ pasang_domain() {
   echo -e "  Enter NS Domain for SlowDNS"
   echo -e "  Example: dns.$DOMAIN"
   echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  read -p " Input NS Domain : " NS_DOMAIN
+  safe_read "Input NS Domain : " NS_DOMAIN
+  NS_DOMAIN=$(clean_input "$NS_DOMAIN")
   if [[ -z "$NS_DOMAIN" ]]; then
     NS_DOMAIN="dns.$DOMAIN"
     echo -e "${YELLOW}[*] Using default NS Domain: $NS_DOMAIN${NC}"
