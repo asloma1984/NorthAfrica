@@ -394,19 +394,21 @@ else
   echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
 
-# Ask for client name (as in register file) - FIXED INPUT ISSUE
+# Ask for subscriber name (as in register file)
 echo ""
-echo -e "Please Enter Your Client Name"
-safe_read "Client Name : " SUBSCRIBER_NAME
+echo -e "Enter subscriber name (as registered)"
+read -rp "Subscriber Name : " SUBSCRIBER_NAME
+SUBSCRIBER_NAME=$(echo "$SUBSCRIBER_NAME" | tr -d '\r\n')
+SUBSCRIBER_NAME=$(echo "$SUBSCRIBER_NAME" | xargs 2>/dev/null || echo "$SUBSCRIBER_NAME")
 
 # Validate input
 if [[ -z "$SUBSCRIBER_NAME" ]]; then
-  echo -e "${ERROR} Client name cannot be empty.${NC}"
+  echo -e "${ERROR} Subscriber name cannot be empty.${NC}"
   clean_and_exit
 fi
 
 # Show what was entered (for debugging)
-echo -e "Checking client name ($SUBSCRIBER_NAME), please wait...."
+echo -e "Checking subscriber name ($SUBSCRIBER_NAME), please wait...."
 sleep 2
 
 #-------------------------------------------------------------------------------
@@ -424,8 +426,8 @@ license_denied_not_registered() {
   echo -e "          ${BLUE2}${BOLD}PERMISSION DENIED!${NC}"
   echo ""
   echo -e " ${BLUE2}Your VPS is NOT registered.${NC}"
-  echo -e " ${BLUE2}VPS IP       : ${YELLOW}${MYIP}${NC}"
-  echo -e " ${BLUE2}Client Name  : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
+  echo -e " ${BLUE2}VPS IP          : ${YELLOW}${MYIP}${NC}"
+  echo -e " ${BLUE2}Subscriber Name : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
   echo ""
   echo -e " ${BLUE2}Please contact the developer for activation:${NC}"
   echo ""
@@ -444,9 +446,9 @@ license_denied_expired() {
   echo -e "          ${BLUE2}${BOLD}PERMISSION DENIED!${NC}"
   echo ""
   echo -e " ${BLUE2}Your VPS is NOT registered (expired).${NC}"
-  echo -e " ${BLUE2}VPS IP       : ${YELLOW}${MYIP}${NC}"
-  echo -e " ${BLUE2}Client Name  : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
-  echo -e " ${BLUE2}Expired On   : ${YELLOW}${exp_date}${NC}"
+  echo -e " ${BLUE2}VPS IP          : ${YELLOW}${MYIP}${NC}"
+  echo -e " ${BLUE2}Subscriber Name : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
+  echo -e " ${BLUE2}Expired On      : ${YELLOW}${exp_date}${NC}"
   echo ""
   echo -e " ${BLUE2}Please contact the developer for renewal:${NC}"
   echo ""
@@ -503,7 +505,7 @@ license_check() {
   echo "$USERNAME" >/usr/bin/user
   echo "$EXP_DATE" >/usr/bin/e
 
-  echo -e "${OK} License OK for client ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
+  echo -e "${OK} License OK for subscriber ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
 }
 
 license_check
