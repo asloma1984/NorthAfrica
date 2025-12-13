@@ -299,6 +299,16 @@ restart_service() {
   return 1
 }
 
+# Function to clean input and fix buffer issues
+clean_input() {
+    local input="$1"
+    # Remove carriage returns, newlines, and extra spaces
+    input=$(echo "$input" | tr -d '\r\n' | xargs)
+    # Remove any non-alphanumeric characters (optional)
+    input=$(echo "$input" | sed 's/[^a-zA-Z0-9]//g')
+    echo "$input"
+}
+
 # ─────────────────────────────────────────────────────
 # Start: basic checks & banner
 # ─────────────────────────────────────────────────────
@@ -350,10 +360,15 @@ else
   echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
 
-# Ask for client name (as in register file)
+# Ask for client name (as in register file) - FIXED INPUT ISSUE
 echo ""
 echo -e "Please Enter Your Client Name"
+# Clear input buffer before reading
+while read -t 0; do read -r; done
+# Read input without color formatting to avoid buffer issues
 read -rp "Client Name : " SUBSCRIBER_NAME
+# Remove any carriage returns or extra characters
+SUBSCRIBER_NAME=$(clean_input "$SUBSCRIBER_NAME")
 echo -e "Checking client name, please wait...."
 sleep 2
 
