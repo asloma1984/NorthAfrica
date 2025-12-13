@@ -10,22 +10,23 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 # Ensure openssl is installed
-if ! command- v openssl >/dev/null 2>&1; then
+if ! command -v openssl >/dev/null 2>&1; then
   apt update -y && apt install -y openssl
 fi
 
-TMP=$(mktemp)
+TMP="$(mktemp -t na_premium.XXXXXX)"
 
 echo ""
-echo "Downloading encrypted installer..."
+echo "Downloading encrypted installer from GitHub..."
 # Download encrypted file from GitHub
 if ! curl -fsSL "$ENC_URL" -o "$TMP"; then
-  echo "[ERROR] Failed to download premium.enc"
+  echo "[ERROR] Failed to download premium.enc from $ENC_URL"
   rm -f "$TMP"
   exit 1
 fi
 
 # Ask for the same password used with openssl enc
+echo ""
 read -s -p "Enter installer password: " PASS
 echo ""
 
@@ -39,3 +40,4 @@ if ! openssl enc -d -aes-256-cbc -pbkdf2 \
 fi
 
 rm -f "$TMP"
+echo "Installer finished successfully."
