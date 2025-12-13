@@ -350,11 +350,15 @@ else
   echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
 
-# Ask client for subscriber name (as in register file)
+# Ask for client name (as in register file)
 echo ""
-read -rp "Enter subscriber name (as registered) : " SUBSCRIBER_NAME
+echo -e "Please enter your client name"
+read -rp "Client Name : " SUBSCRIBER_NAME
+echo -e "Checking client name, please wait...."
+sleep 2
+
 if [[ -z "$SUBSCRIBER_NAME" ]]; then
-  echo -e "${ERROR} Subscriber name cannot be empty.${NC}"
+  echo -e "${ERROR} Client name cannot be empty.${NC}"
   clean_and_exit
 fi
 
@@ -373,8 +377,8 @@ license_denied_not_registered() {
   echo -e "          ${BLUE2}${BOLD}PERMISSION DENIED!${NC}"
   echo ""
   echo -e " ${BLUE2}Your VPS is NOT registered.${NC}"
-  echo -e " ${BLUE2}VPS IP   : ${YELLOW}${MYIP}${NC}"
-  echo -e " ${BLUE2}Name     : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
+  echo -e " ${BLUE2}VPS IP       : ${YELLOW}${MYIP}${NC}"
+  echo -e " ${BLUE2}Client Name  : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
   echo ""
   echo -e " ${BLUE2}Please contact the developer for activation:${NC}"
   echo ""
@@ -393,9 +397,9 @@ license_denied_expired() {
   echo -e "          ${BLUE2}${BOLD}PERMISSION DENIED!${NC}"
   echo ""
   echo -e " ${BLUE2}Your VPS is NOT registered (expired).${NC}"
-  echo -e " ${BLUE2}VPS IP   : ${YELLOW}${MYIP}${NC}"
-  echo -e " ${BLUE2}Name     : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
-  echo -e " ${BLUE2}Expired  : ${YELLOW}${exp_date}${NC}"
+  echo -e " ${BLUE2}VPS IP       : ${YELLOW}${MYIP}${NC}"
+  echo -e " ${BLUE2}Client Name  : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
+  echo -e " ${BLUE2}Expired On   : ${YELLOW}${exp_date}${NC}"
   echo ""
   echo -e " ${BLUE2}Please contact the developer for renewal:${NC}"
   echo ""
@@ -452,7 +456,7 @@ license_check() {
   echo "$USERNAME" >/usr/bin/user
   echo "$EXP_DATE" >/usr/bin/e
 
-  echo -e "${OK} License OK for user ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
+  echo -e "${OK} License OK for client ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
 }
 
 license_check
