@@ -419,16 +419,21 @@ license_check() {
     clean_and_exit
   fi
 
+  # Fetch register file
   data=$(safe_curl "$LICENSE_URL") || {
     echo -e "${ERROR} Unable to fetch license data from register.${NC}"
     license_denied_not_registered
   }
 
-  # Register line format example:
-  # ### Abdul 2027-08-09 31.14.135.141
-  # Field2 = name, Field3 = expiry, last field = IP
+  # Normalize lines and ensure each '###' starts on its own line
+  data=$(echo "$data" | tr '\r' '\n' | sed 's/###/\n###/g')
+
+  # Expected line format:
+  # ### Name YYYY-MM-DD IP
   line=$(echo "$data" \
-    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$NF==ip && $2==name {print}')
+    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '
+        $1=="###" && $2==name && $NF==ip {print; exit}
+      ')
 
   if [[ -z "$line" ]]; then
     license_denied_not_registered
@@ -783,7 +788,7 @@ make_folder_xray() {
   echo "& plugin Account" >>/etc/trojan/.trojan.db
   echo "& plugin Account" >>/etc/shadowsocks/.shadowsocks.db
   echo "& plugin Account" >>/etc/ssh/.ssh.db
-  echo "echo -e 'Vps Config User Account'" >> /etc/user-create/user.log
+  echo "echo -e 'VPS Config User Account'" >> /etc/user-create/user.log
 }
 
 # ─────────────────────────────────────────────
