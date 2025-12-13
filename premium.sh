@@ -352,7 +352,7 @@ fi
 
 # Ask for client name (as in register file)
 echo ""
-echo -e "Please enter your client name"
+echo -e "Please Enter Your Client Name"
 read -rp "Client Name : " SUBSCRIBER_NAME
 echo -e "Checking client name, please wait...."
 sleep 2
@@ -888,7 +888,6 @@ install_xray() {
   chmod 644 /etc/xray/xray.crt
   chmod 600 /etc/haproxy/hap.pem
 
-  # xray.service – still points to /etc/xray/config.json
 cat >/etc/systemd/system/xray.service <<EOF
 [Unit]
 Description=Xray Service
