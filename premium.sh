@@ -217,10 +217,10 @@ ensure_early_dependencies() {
     sleep 2
   done
 
-  # Install essential packages (include tmux for auto_tmux)
+  # Install essential packages
   DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl wget ca-certificates iproute2 dnsutils net-tools \
-    lsb-release gnupg gnupg2 unzip tmux >/dev/null 2>&1 || true
+    lsb-release gnupg gnupg2 unzip >/dev/null 2>&1 || true
 }
 
 detect_os() {
@@ -299,50 +299,6 @@ restart_service() {
   return 1
 }
 
-# Function to clean input and fix buffer issues - ENHANCED VERSION
-clean_input() {
-    local input="$1"
-    # Remove all control characters
-    input=$(echo "$input" | sed 's/[[:cntrl:]]//g')
-    # Remove ANSI escape sequences
-    input=$(echo "$input" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
-    # Remove carriage returns, newlines
-    input=$(echo "$input" | tr -d '\r\n')
-    # Trim leading and trailing whitespace
-    input=$(echo "$input" | xargs 2>/dev/null || echo "$input")
-    # Keep printable ASCII only
-    input=$(echo "$input" | tr -cd '\11\12\15\40-\176')
-    echo "$input"
-}
-
-# Flush any buffered stdin (fixes "extra letters" / broken prompts)
-flush_stdin() {
-  while read -r -t 0; do
-    read -r
-  done
-}
-
-# Function to safely read input without escape sequences (STABLE - no stty/dd)
-safe_read() {
-  local prompt="$1"
-  local variable="$2"
-  local input=""
-
-  flush_stdin
-
-  if [[ -t 0 ]]; then
-    # Normal interactive
-    IFS= read -r -p "$prompt" input
-  else
-    # Non-tty (rare)
-    echo -n "$prompt"
-    IFS= read -r input
-  fi
-
-  input="$(clean_input "$input")"
-  eval "$variable=\"\$input\""
-}
-
 # ─────────────────────────────────────────────────────
 # Start: basic checks & banner
 # ─────────────────────────────────────────────────────
@@ -394,22 +350,13 @@ else
   echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
 
-# Ask for subscriber name (as in register file)
+# Ask client for subscriber name (as in register file)
 echo ""
-echo -e "Enter subscriber name (as registered)"
-read -rp "Subscriber Name : " SUBSCRIBER_NAME
-SUBSCRIBER_NAME=$(echo "$SUBSCRIBER_NAME" | tr -d '\r\n')
-SUBSCRIBER_NAME=$(echo "$SUBSCRIBER_NAME" | xargs 2>/dev/null || echo "$SUBSCRIBER_NAME")
-
-# Validate input
+read -rp "Enter subscriber name (as registered) : " SUBSCRIBER_NAME
 if [[ -z "$SUBSCRIBER_NAME" ]]; then
   echo -e "${ERROR} Subscriber name cannot be empty.${NC}"
   clean_and_exit
 fi
-
-# Show what was entered (for debugging)
-echo -e "Checking subscriber name ($SUBSCRIBER_NAME), please wait...."
-sleep 2
 
 #-------------------------------------------------------------------------------
 #  LICENSE / REGISTER CHECK (PRIVATE)  -  IP + NAME COMBINATION
@@ -426,8 +373,8 @@ license_denied_not_registered() {
   echo -e "          ${BLUE2}${BOLD}PERMISSION DENIED!${NC}"
   echo ""
   echo -e " ${BLUE2}Your VPS is NOT registered.${NC}"
-  echo -e " ${BLUE2}VPS IP          : ${YELLOW}${MYIP}${NC}"
-  echo -e " ${BLUE2}Subscriber Name : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
+  echo -e " ${BLUE2}VPS IP   : ${YELLOW}${MYIP}${NC}"
+  echo -e " ${BLUE2}Name     : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
   echo ""
   echo -e " ${BLUE2}Please contact the developer for activation:${NC}"
   echo ""
@@ -446,9 +393,9 @@ license_denied_expired() {
   echo -e "          ${BLUE2}${BOLD}PERMISSION DENIED!${NC}"
   echo ""
   echo -e " ${BLUE2}Your VPS is NOT registered (expired).${NC}"
-  echo -e " ${BLUE2}VPS IP          : ${YELLOW}${MYIP}${NC}"
-  echo -e " ${BLUE2}Subscriber Name : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
-  echo -e " ${BLUE2}Expired On      : ${YELLOW}${exp_date}${NC}"
+  echo -e " ${BLUE2}VPS IP   : ${YELLOW}${MYIP}${NC}"
+  echo -e " ${BLUE2}Name     : ${YELLOW}${SUBSCRIBER_NAME}${NC}"
+  echo -e " ${BLUE2}Expired  : ${YELLOW}${exp_date}${NC}"
   echo ""
   echo -e " ${BLUE2}Please contact the developer for renewal:${NC}"
   echo ""
@@ -458,7 +405,7 @@ license_denied_expired() {
 }
 
 license_check() {
-  local data line today
+  local data line
 
   # Fix DNS before license check
   fix_dns
@@ -472,21 +419,16 @@ license_check() {
     clean_and_exit
   fi
 
-  # Fetch register file
   data=$(safe_curl "$LICENSE_URL") || {
     echo -e "${ERROR} Unable to fetch license data from register.${NC}"
     license_denied_not_registered
   }
 
-  # Normalize lines and ensure each '###' starts on its own line
-  data=$(echo "$data" | tr '\r' '\n' | sed 's/###/\n###/g')
-
-  # Expected line format:
-  # ### Name YYYY-MM-DD IP
+  # Register line format example:
+  # ### Abdul 2027-08-09 31.14.135.141
+  # Field2 = name, Field3 = expiry, last field = IP
   line=$(echo "$data" \
-    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '
-        $1=="###" && $2==name && $NF==ip {print; exit}
-      ')
+    | awk -v ip="$MYIP" -v name="$SUBSCRIBER_NAME" '$NF==ip && $2==name {print}')
 
   if [[ -z "$line" ]]; then
     license_denied_not_registered
@@ -505,7 +447,7 @@ license_check() {
   echo "$USERNAME" >/usr/bin/user
   echo "$EXP_DATE" >/usr/bin/e
 
-  echo -e "${OK} License OK for subscriber ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
+  echo -e "${OK} License OK for user ${green}$USERNAME${NC} (expires: ${YELLOW}$EXP_DATE${NC})"
 }
 
 license_check
@@ -687,15 +629,14 @@ pasang_domain() {
   echo -e "  1) Use your domain (recommended)"
   echo -e "  2) Use random subdomain via Cloudflare script"
   echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  safe_read "Select 1-2 (or any key for random) : " host
+  read -p " Select 1-2 (or any key for random) : " host
   echo ""
 
   if [[ $host == "1" ]]; then
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo -e "  Enter your MAIN domain (example: vpn.yourdomain.com)"
     echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    safe_read "Input Domain : " DOMAIN
-    DOMAIN=$(clean_input "$DOMAIN")
+    read -p " Input Domain : " DOMAIN
     if [[ -z "$DOMAIN" ]]; then
       echo -e "\e[31m[ERROR] Domain cannot be empty!\e[0m"
       exit 1
@@ -722,8 +663,7 @@ pasang_domain() {
   echo -e "  Enter NS Domain for SlowDNS"
   echo -e "  Example: dns.$DOMAIN"
   echo -e " ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  safe_read "Input NS Domain : " NS_DOMAIN
-  NS_DOMAIN=$(clean_input "$NS_DOMAIN")
+  read -p " Input NS Domain : " NS_DOMAIN
   if [[ -z "$NS_DOMAIN" ]]; then
     NS_DOMAIN="dns.$DOMAIN"
     echo -e "${YELLOW}[*] Using default NS Domain: $NS_DOMAIN${NC}"
@@ -843,7 +783,7 @@ make_folder_xray() {
   echo "& plugin Account" >>/etc/trojan/.trojan.db
   echo "& plugin Account" >>/etc/shadowsocks/.shadowsocks.db
   echo "& plugin Account" >>/etc/ssh/.ssh.db
-  echo "echo -e 'VPS Config User Account'" >> /etc/user-create/user.log
+  echo "echo -e 'Vps Config User Account'" >> /etc/user-create/user.log
 }
 
 # ─────────────────────────────────────────────
@@ -901,7 +841,7 @@ install_xray() {
   sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
   sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/ws.conf
 
-  safe_curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf || true
+  safe_curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
 
   # Fix HAProxy config
   if [[ -f /etc/haproxy/haproxy.cfg ]]; then
@@ -939,6 +879,7 @@ install_xray() {
   chmod 644 /etc/xray/xray.crt
   chmod 600 /etc/haproxy/hap.pem
 
+  # xray.service – still points to /etc/xray/config.json
 cat >/etc/systemd/system/xray.service <<EOF
 [Unit]
 Description=Xray Service
@@ -1202,36 +1143,6 @@ EOF
   print_success "Dropbear"
 }
 
-# ─────────────────────────────────────────────
-# Squid Proxy Installation
-# ─────────────────────────────────────────────
-ins_squid(){
-  clear
-  print_install "Install Squid Proxy"
-
-  apt-get install -y squid 2>/dev/null || {
-    print_error "Failed to install Squid package"
-    return 1
-  }
-
-  # Download Squid configuration from repo (config/squid/squid.conf)
-  safe_download "${REPO}config/squid/squid.conf" /etc/squid/squid.conf
-
-  mkdir -p /var/log/squid
-  chown proxy:proxy /var/log/squid -R 2>/dev/null || true
-
-  systemctl daemon-reload
-  systemctl enable squid 2>/dev/null || true
-  systemctl restart squid 2>/dev/null || true
-
-  # Open Squid port
-  iptables -I INPUT -p tcp --dport 3128 -j ACCEPT 2>/dev/null || true
-  netfilter-persistent save 2>/dev/null || true
-  netfilter-persistent reload 2>/dev/null || true
-
-  print_success "Squid Proxy"
-}
-
 ins_vnstat(){
   clear
   print_install "Install Vnstat"
@@ -1446,7 +1357,6 @@ ins_restart(){
   restart_service openvpn
   restart_service ssh
   restart_service dropbear
-  restart_service squid
   restart_service fail2ban
   restart_service vnstat
   restart_service haproxy
@@ -1469,7 +1379,6 @@ ins_restart(){
   systemctl enable fail2ban 2>/dev/null || true
   systemctl enable ssh 2>/dev/null || true
   systemctl enable slowdns 2>/dev/null || true
-  systemctl enable squid 2>/dev/null || true
 
   history -c
   echo "unset HISTFILE" >> /etc/profile
@@ -1600,7 +1509,6 @@ enable_services(){
   systemctl enable ssh 2>/dev/null || true
   systemctl enable ws 2>/dev/null || true
   systemctl enable slowdns 2>/dev/null || true
-  systemctl enable squid 2>/dev/null || true
   print_success "Services enabled"
   clear
 }
@@ -1621,7 +1529,6 @@ instal(){
   install_slowdns
   ins_SSHD
   ins_dropbear
-  ins_squid
   ins_vnstat
   ins_openvpn
   ins_backup
