@@ -6,21 +6,24 @@ ENC_URL="$REPO_BASE/premium.enc"
 
 # Ensure curl is installed
 if ! command -v curl >/dev/null 2>&1; then
-  apt update -y && apt install -y curl
+  apt-get update -y && apt-get install -y curl
 fi
 
 # Ensure openssl is installed
 if ! command -v openssl >/dev/null 2>&1; then
-  apt update -y && apt install -y openssl
+  apt-get update -y && apt-get install -y openssl
 fi
 
-TMP="$(mktemp -t na_premium.XXXXXX)"
+TMP=$(mktemp)
 
 echo ""
+echo ">>> NorthAfrica Encrypted Installer"
 echo "Downloading encrypted installer from GitHub..."
+
 # Download encrypted file from GitHub
 if ! curl -fsSL "$ENC_URL" -o "$TMP"; then
-  echo "[ERROR] Failed to download premium.enc from $ENC_URL"
+  echo "[ERROR] Failed to download premium.enc from:"
+  echo "        $ENC_URL"
   rm -f "$TMP"
   exit 1
 fi
@@ -34,10 +37,15 @@ echo "Decrypting and running installer..."
 if ! openssl enc -d -aes-256-cbc -pbkdf2 \
   -pass pass:"$PASS" \
   -in "$TMP" | bash; then
-  echo "[ERROR] Decrypt or run failed (wrong password or corrupted file)"
+  echo ""
+  echo "[ERROR] Decrypt or run failed."
+  echo "  - Wrong password, OR"
+  echo "  - premium.enc is corrupted."
   rm -f "$TMP"
   exit 1
 fi
 
 rm -f "$TMP"
-echo "Installer finished successfully."
+echo ""
+echo "Installer finished. You can now use NorthAfrica Script."
+exit 0
