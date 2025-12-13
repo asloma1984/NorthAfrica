@@ -217,10 +217,10 @@ ensure_early_dependencies() {
     sleep 2
   done
 
-  # Install essential packages
+  # Install essential packages (include tmux for auto_tmux)
   DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl wget ca-certificates iproute2 dnsutils net-tools \
-    lsb-release gnupg gnupg2 unzip >/dev/null 2>&1 || true
+    lsb-release gnupg gnupg2 unzip tmux >/dev/null 2>&1 || true
 }
 
 detect_os() {
@@ -302,64 +302,45 @@ restart_service() {
 # Function to clean input and fix buffer issues - ENHANCED VERSION
 clean_input() {
     local input="$1"
-    # Remove all control characters and escape sequences
+    # Remove all control characters
     input=$(echo "$input" | sed 's/[[:cntrl:]]//g')
     # Remove ANSI escape sequences
     input=$(echo "$input" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
     # Remove carriage returns, newlines
     input=$(echo "$input" | tr -d '\r\n')
     # Trim leading and trailing whitespace
-    input=$(echo "$input" | xargs)
-    # Remove any non-printable characters
+    input=$(echo "$input" | xargs 2>/dev/null || echo "$input")
+    # Keep printable ASCII only
     input=$(echo "$input" | tr -cd '\11\12\15\40-\176')
     echo "$input"
 }
 
-# Function to safely read input without escape sequences
+# Flush any buffered stdin (fixes "extra letters" / broken prompts)
+flush_stdin() {
+  while read -r -t 0; do
+    read -r
+  done
+}
+
+# Function to safely read input without escape sequences (STABLE - no stty/dd)
 safe_read() {
-    local prompt="$1"
-    local variable="$2"
-    
-    # Save current terminal settings
-    local old_stty
-    old_stty=$(stty -g)
-    
-    # Disable echo and canonical processing
-    stty -echo -icanon
-    
-    # Clear input buffer
-    while read -t 0; do read -r; done
-    
-    # Print prompt
+  local prompt="$1"
+  local variable="$2"
+  local input=""
+
+  flush_stdin
+
+  if [[ -t 0 ]]; then
+    # Normal interactive
+    IFS= read -r -p "$prompt" input
+  else
+    # Non-tty (rare)
     echo -n "$prompt"
-    
-    # Read input character by character to avoid escape sequences
-    local input=""
-    local char
-    local IFS=''
-    
-    while true; do
-        char=$(dd bs=1 count=1 2>/dev/null)
-        case "$char" in
-            $'\n') break ;;  # Enter key
-            $'\177') # Backspace
-                if [ -n "$input" ]; then
-                    input="${input%?}"
-                    echo -n $'\b \b'
-                fi
-                ;;
-            [[:print:]]) # Printable characters only
-                input="$input$char"
-                echo -n "$char"
-                ;;
-        esac
-    done
-    
-    # Restore terminal settings
-    stty "$old_stty"
-    
-    echo
-    eval "$variable=\"$input\""
+    IFS= read -r input
+  fi
+
+  input="$(clean_input "$input")"
+  eval "$variable=\"\$input\""
 }
 
 # ─────────────────────────────────────────────────────
@@ -416,12 +397,7 @@ fi
 # Ask for client name (as in register file) - FIXED INPUT ISSUE
 echo ""
 echo -e "Please Enter Your Client Name"
-
-# Use safe_read function to avoid escape sequences
 safe_read "Client Name : " SUBSCRIBER_NAME
-
-# Clean the input thoroughly
-SUBSCRIBER_NAME=$(clean_input "$SUBSCRIBER_NAME")
 
 # Validate input
 if [[ -z "$SUBSCRIBER_NAME" ]]; then
@@ -480,7 +456,7 @@ license_denied_expired() {
 }
 
 license_check() {
-  local data line
+  local data line today
 
   # Fix DNS before license check
   fix_dns
@@ -923,7 +899,7 @@ install_xray() {
   sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
   sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/ws.conf
 
-  safe_curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf
+  safe_curl "${REPO}config/nginx.conf" > /etc/nginx/nginx.conf || true
 
   # Fix HAProxy config
   if [[ -f /etc/haproxy/haproxy.cfg ]]; then
